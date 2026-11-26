@@ -27,6 +27,12 @@ html,body{margin:0;height:100%;overflow:hidden;background:#1e2a4a;font-family:Pr
 .btn{position:fixed;border:0;border-radius:14px;font:900 16px Pretendard,sans-serif;touch-action:none;color:#0b0e11}
 .btn:active{transform:translateY(2px)}
 #jump{right:calc(18px + env(safe-area-inset-right));bottom:calc(30px + env(safe-area-inset-bottom));width:82px;height:82px;background:#0ecb81}
+#boardBtn{right:calc(18px + env(safe-area-inset-right));bottom:calc(182px + env(safe-area-inset-bottom));width:82px;height:48px;background:#46ff6e}
+#big{position:fixed;inset:0;background:#000e;display:none;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:12px;z-index:6}
+#big.on{display:flex}
+#bigC{width:100%;max-height:78vh;object-fit:contain;border:4px solid #2a2d33;border-radius:6px}
+#big p{margin:0;color:#9aa3ae;font-size:13px}
+#bigX{font:800 16px Pretendard,sans-serif;border:0;border-radius:8px;padding:10px 26px;background:#ffd23a;color:#111}
 #chatBtn{right:calc(18px + env(safe-area-inset-right));bottom:calc(124px + env(safe-area-inset-bottom));width:82px;height:48px;background:#fcd535}
 #log{position:fixed;left:calc(12px + env(safe-area-inset-left));bottom:calc(166px + env(safe-area-inset-bottom));width:min(68vw,330px);display:flex;flex-direction:column;gap:4px;pointer-events:none}
 #log div{background:#0b0e11cc;border-radius:6px;padding:4px 9px;font-size:13.5px;line-height:1.4;word-break:break-all;transition:opacity 1s}
@@ -61,14 +67,15 @@ html,body{margin:0;height:100%;overflow:hidden;background:#1e2a4a;font-family:Pr
   <div class="chip r" id="net"><i></i><span id="netT">오프라인</span></div>
   <div class="chip">코인 <b id="score">0</b></div>
 </div>
-<div id="pop"><div class="t" id="pt"></div><div class="v" id="pv"></div><div class="s" id="ps"></div></div>
 <div id="tags"></div>
 <div id="log"></div>
 <div id="joy"><div id="knob"></div></div>
+<button class="btn" id="boardBtn">전광판</button>
 <button class="btn" id="chatBtn">채팅</button>
+<div id="big"><canvas id="bigC" width="2048" height="1024"></canvas><p>폰을 가로로 돌리면 더 크게 보여요</p><button id="bigX">닫기</button></div>
 <button class="btn" id="jump" aria-label="점프">점프</button>
 <form id="bar"><input id="msg" maxlength="80" placeholder="메시지 입력" autocomplete="off" enterkeyhint="send"><button type="submit">보내기</button><button type="button" class="x" id="barX">닫기</button></form>
-<div class="help" id="help">조이스틱 이동 · 드래그로 시점 회전 · 전광판에 다가가 보세요</div>
+<div class="help" id="help">조이스틱 이동 · 드래그로 시점 회전 · 전광판 버튼으로 크게 보기</div>
 <div id="start"><form class="box" id="startF">
   <h1>BTC 스트리트</h1>
   <p>월가 거리에서 시세 전광판을 둘러보고<br>친구와 채팅해요.</p>
@@ -84,7 +91,7 @@ const $=id=>document.getElementById(id);
 if(!window.THREE){document.querySelector('#start p').textContent='3D 엔진을 불러오지 못했어요. 새로고침해 주세요.';throw 0}
 
 /* ================= 시세 ================= */
-const D={bn:0,bnP:0,ub:0,ubP:0,usdt:0};
+const D={bn:0,bnP:0,ub:0,ubP:0,usdt:0,usdtP:0,coins:{}};
 const KEY='btc-athlow-v1',BASE={ath:126273,athDate:'2025-10-06',low:55130,lowDate:'2026-11-21'};
 let S={...BASE};
 try{const s=JSON.parse(localStorage.getItem(KEY)||'null');if(s&&s.ath>=BASE.ath)S=s}catch(e){}
@@ -101,9 +108,9 @@ let dirty=true;
 function onBn(c,P){D.bn=c;D.bnP=P;$('hp').textContent=usd(c);if(newPrice(c,todayKST()))save();dirty=true}
 function upbit(){let ws;try{ws=new WebSocket('wss://api.upbit.com/websocket/v1')}catch(e){return}
   ws.binaryType='arraybuffer';
-  ws.onopen=()=>ws.send(JSON.stringify([{ticket:'v-'+Date.now()},{type:'ticker',codes:['KRW-BTC','KRW-USDT']}]));
+  ws.onopen=()=>ws.send(JSON.stringify([{ticket:'v-'+Date.now()},{type:'ticker',codes:['KRW-BTC','KRW-USDT','KRW-ETH','KRW-XRP','KRW-SOL','KRW-DOGE','KRW-ADA','KRW-TRX','KRW-LINK','KRW-AVAX','KRW-BCH','KRW-DOT']}]));
   ws.onmessage=e=>{try{const x=JSON.parse(typeof e.data==='string'?e.data:new TextDecoder().decode(e.data));
-    if(x.code==='KRW-BTC'){D.ub=x.trade_price;D.ubP=x.signed_change_rate*100}if(x.code==='KRW-USDT')D.usdt=x.trade_price;dirty=true}catch(er){}};
+    if(x.code==='KRW-BTC'){D.ub=x.trade_price;D.ubP=x.signed_change_rate*100}if(x.code==='KRW-USDT'){D.usdt=x.trade_price;D.usdtP=x.signed_change_rate*100}else if(x.code!=='KRW-BTC')D.coins[x.code]={p:x.trade_price,r:x.signed_change_rate*100};dirty=true}catch(er){}};
   ws.onclose=()=>setTimeout(upbit,3000)}
 const bnUrls=['wss://stream.binance.com:9443/ws/btcusdt@ticker','wss://data-stream.binance.vision/ws/btcusdt@ticker'];let bi=0,got=false;
 function binance(){let ws;try{ws=new WebSocket(bnUrls[bi%2])}catch(e){return}
@@ -120,8 +127,8 @@ function boards(){
   const k=D.ub&&D.bn&&D.usdt?(D.ub/(D.bn*D.usdt)-1)*100:null,t=dayN(todayKST());
   const dd=D.bn?(D.bn/S.ath-1)*100:null,fl=D.bn&&S.low?(D.bn/S.low-1)*100:null;
   return[
-    {t:'BINANCE  BTC/USDT',v:D.bn?usd(D.bn):'연결 중',s:D.bn?sign(D.bnP)+' 24h':'',c:D.bnP>=0?'#0ecb81':'#f6465d'},
-    {t:'UPBIT  BTC/KRW',v:D.ub?krw(D.ub):'연결 중',s:D.ub?sign(D.ubP)+' 24h':'',c:D.ubP>=0?'#0ecb81':'#f6465d'},
+    {t:'BINANCE  BTC/USDT',v:D.bn?usd(D.bn):'연결 중',s:D.bn?sign(D.bnP)+' 24h':'',c:D.bnP>=0?'#ff4636':'#3aa0ff'},
+    {t:'UPBIT  BTC/KRW',v:D.ub?krw(D.ub):'연결 중',s:D.ub?sign(D.ubP)+' 24h':'',c:D.ubP>=0?'#ff4636':'#3aa0ff'},
     {t:'김치프리미엄',v:k==null?'계산 중':sign(k),s:D.usdt?'USDT '+krw(D.usdt):'',c:'#fcd535'},
     {t:'ATH '+usd(S.ath),v:dd==null?'–':sign(dd),s:fmtD(S.athDate)+' · '+(t-dayN(S.athDate))+'일 지남',c:'#f6465d'},
     {t:'ATH 이후 저점 '+(S.low?usd(S.low):'–'),v:fl==null?'–':sign(fl),s:S.low?fmtD(S.lowDate)+' · ATH 후 '+(dayN(S.lowDate)-dayN(S.athDate))+'일째':'',c:'#0ecb81'}]}
@@ -175,51 +182,72 @@ for(let z=-24;z<=2;z+=6.5){bldg(-24,z,6,5.6,14+((z*5)%11+11)%11*1.6,tints[bv%5],
 for(let x=-16;x<=16;x+=8){if(Math.abs(x)<10)continue;bldg(x,-27,7,6,26+Math.abs(x),tints[bv%5],bv++)}
 bldg(0,-29,14,4,34,'#b8c4d6',bv++);
 
-/* 거래소 건물 */
+/* 거래소 건물 + 대형 시세판 */
 const stone='#e7e2d6',stone2='#d4cebf';
-box(18,.3,3.2,stone2,0,.15,-12.6);box(17,.3,2.6,stone2,0,.45,-13);box(16,.3,2,stone2,0,.75,-13.4);
-box(16,10,7,stone,0,5,-18);
-for(let i=0;i<6;i++){const x=-6.25+i*2.5;box(.95,7.6,.95,'#f4f1ea',x,4.7,-14.2);box(1.3,.4,1.3,stone2,x,1.1,-14.2);box(1.3,.4,1.3,stone2,x,8.5,-14.2)}
-box(17,.9,1.6,stone2,0,9.15,-14.5);
-for(let i=0;i<4;i++)box(17-i*4.2,.75,1.3,stone,0,10+i*.75,-14.6);
-for(let i=0;i<3;i++)box(1.4,2.6,.15,'#2a2f38',-5+i*5,2.3,-14.95);
-rects.push({x0:-8,x1:8,z0:-21.5,z1:-14.6});
+box(28,.3,3.2,stone2,0,.15,-12.4);box(27,.3,2.6,stone2,0,.45,-12.8);box(26,.3,2,stone2,0,.75,-13.2);
+box(26,15,7,stone,0,7.5,-18);
+box(27,.9,1.4,stone2,0,15.2,-14.6);for(let i=0;i<4;i++)box(26-i*6,.8,1.2,stone,0,16+i*.8,-14.7);
+for(const x of [-12.4,12.4]){box(1.2,14,1.2,'#f4f1ea',x,7.5,-14.4)}
+rects.push({x0:-13,x1:13,z0:-21.5,z1:-13.9});
+/* 시세판 캔버스 */
+const BC=document.createElement('canvas');BC.width=2048;BC.height=1024;
+const bigT=new THREE.CanvasTexture(BC);bigT.colorSpace=THREE.SRGBColorSpace;bigT.anisotropy=8;
+box(23.4,11.4,.5,'#15171b',0,7,-14.15);
+const scr=new THREE.Mesh(BOX,[dark2(),dark2(),dark2(),dark2(),new THREE.MeshBasicMaterial({map:bigT}),dark2()]);scr.scale.set(22.4,11.2,.2);scr.position.set(0,7,-13.85);scene.add(scr);
+function dark2(){return M('#111')}
+const COINS=[['KRW-ETH','이더리움'],['KRW-XRP','리플'],['KRW-SOL','솔라나'],['KRW-DOGE','도지코인'],['KRW-ADA','에이다'],['KRW-TRX','트론'],['KRW-LINK','체인링크'],['KRW-AVAX','아발란체'],['KRW-BCH','비트코인캐시'],['KRW-DOT','폴카닷']];
+const UP='#ff4636',DN='#3aa0ff',NUM='#46ff6e',LAB='#f2f2f2',YEL='#ffd23a';
+const arrow=v=>v==null?'':(v>=0?'▲':'▼')+Math.abs(v).toFixed(2)+'%';
+const kfmt=v=>v>=100?Math.round(v).toLocaleString('ko-KR'):v>=1?v.toFixed(2):v.toFixed(4);
+function drawBig(){
+  const g=BC.getContext('2d'),W=2048,Hh=1024,t=dayN(todayKST());
+  g.fillStyle='#030503';g.fillRect(0,0,W,Hh);
+  g.fillStyle='#0d1f0d';g.fillRect(0,0,W,100);
+  g.textBaseline='middle';g.font='800 50px Pretendard, sans-serif';
+  g.textAlign='left';g.fillStyle=YEL;g.fillText('BTC 핵심 지표',40,52);g.fillText('업비트 원화 시세',1064,52);
+  const n=new Date();g.textAlign='right';g.fillStyle=NUM;g.fillText(String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0')+':'+String(n.getSeconds()).padStart(2,'0'),W-40,52);
+  g.fillStyle='#1d3a1d';g.fillRect(1022,0,4,Hh);
+  const k=D.ub&&D.bn&&D.usdt?(D.ub/(D.bn*D.usdt)-1)*100:null;
+  const dd=D.bn?(D.bn/S.ath-1)*100:null,fl=D.bn&&S.low?(D.bn/S.low-1)*100:null;
+  const pos=D.bn&&S.low?(D.bn-S.low)/(S.ath-S.low)*100:null,need=D.bn?(S.ath/D.bn-1)*100:null;
+  const sd=s=>s?s.slice(2,4)+'.'+s.slice(5,7)+'.'+s.slice(8,10):'';
+  const L=[
+    ['바이낸스 BTC',D.bn?'$'+D.bn.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}):'----',NUM,arrow(D.bn?D.bnP:null),D.bnP>=0?UP:DN],
+    ['업비트 BTC',D.ub?'₩'+Math.round(D.ub).toLocaleString('ko-KR'):'----',NUM,arrow(D.ub?D.ubP:null),D.ubP>=0?UP:DN],
+    ['테더 USDT',D.usdt?'₩'+kfmt(D.usdt):'----',NUM,arrow(D.usdt?D.usdtP:null),D.usdtP>=0?UP:DN],
+    ['김치프리미엄',k==null?'----':(k>=0?'+':'')+k.toFixed(2)+'%',YEL,'',LAB],
+    ['역대 최고가 ATH','$'+Math.round(S.ath).toLocaleString('en-US'),NUM,sd(S.athDate),LAB],
+    ['ATH 대비',dd==null?'----':(dd>=0?'+':'')+dd.toFixed(2)+'%',dd!=null&&dd>=0?UP:DN,(t-dayN(S.athDate))+'일 경과',LAB],
+    ['ATH 후 최저점',S.low?'$'+Math.round(S.low).toLocaleString('en-US'):'----',NUM,sd(S.lowDate),LAB],
+    ['저점 대비',fl==null?'----':(fl>=0?'+':'')+fl.toFixed(2)+'%',fl!=null&&fl>=0?UP:DN,S.low?(t-dayN(S.lowDate))+'일 경과':'',LAB],
+    ['저점↔ATH 위치',pos==null?'----':pos.toFixed(1)+'%',YEL,'',LAB],
+    ['ATH 회복까지',need==null?'----':'+'+Math.max(0,need).toFixed(2)+'%',UP,'',LAB]];
+  const RH=91,Y0=100;
+  L.forEach((r,i)=>{const y=Y0+RH*i+RH/2;
+    g.fillStyle=i%2?'#060c06':'#081208';g.fillRect(0,Y0+RH*i,1022,RH);
+    g.textAlign='left';g.fillStyle=LAB;g.font='700 44px Pretendard, sans-serif';g.fillText(r[0],40,y);
+    g.textAlign='right';g.fillStyle=r[2];g.font='800 54px Pretendard, sans-serif';g.fillText(r[1],770,y);
+    g.fillStyle=r[4];g.font='700 40px Pretendard, sans-serif';g.fillText(r[3],1000,y)});
+  COINS.forEach(([code,name],i)=>{const y=Y0+RH*i+RH/2,c=D.coins[code];
+    g.fillStyle=i%2?'#060c06':'#081208';g.fillRect(1026,Y0+RH*i,W-1026,RH);
+    g.textAlign='left';g.fillStyle=LAB;g.font='700 44px Pretendard, sans-serif';g.fillText(name,1064,y);
+    g.textAlign='right';g.fillStyle=c?(c.r>=0?UP:DN):NUM;g.font='800 54px Pretendard, sans-serif';g.fillText(c?kfmt(c.p):'----',1740,y);
+    g.font='700 40px Pretendard, sans-serif';g.fillText(c?arrow(c.r):'',W-40,y)});
+  g.fillStyle='#000';for(let x=0;x<W;x+=6)g.fillRect(x,0,1.7,Hh);for(let y=0;y<Hh;y+=6)g.fillRect(0,y,W,1.7);
+  bigT.needsUpdate=true;
+  if($('big').classList.contains('on'))$('bigC').getContext('2d').drawImage(BC,0,0)}
 /* LED 전광 띠 */
 const tickC=document.createElement('canvas');tickC.width=2048;tickC.height=96;
-const tickT=new THREE.CanvasTexture(tickC);tickT.colorSpace=THREE.SRGBColorSpace;tickT.wrapS=THREE.RepeatWrapping;tickT.repeat.x=.68;
+const tickT=new THREE.CanvasTexture(tickC);tickT.colorSpace=THREE.SRGBColorSpace;tickT.wrapS=THREE.RepeatWrapping;tickT.repeat.x=.7;
 const tickM=new THREE.MeshBasicMaterial({map:tickT}),dark=M('#111');
-const band=new THREE.Mesh(BOX,[dark,dark,dark,dark,tickM,dark]);band.scale.set(16,1.1,.25);band.position.set(0,12.3,-14.55);scene.add(band);
-box(16.4,.15,.35,glow('#fcd535'),0,12.92,-14.55);box(16.4,.15,.35,glow('#fcd535'),0,11.68,-14.55);
+const band=new THREE.Mesh(BOX,[dark,dark,dark,dark,tickM,dark]);band.scale.set(22,1.2,.25);band.position.set(0,13.6,-14.1);scene.add(band);
+box(22.4,.15,.35,glow('#ffd23a'),0,14.27,-14.1);box(22.4,.15,.35,glow('#ffd23a'),0,12.93,-14.1);
 function drawTicker(){const g=tickC.getContext('2d'),bd=boards();g.fillStyle='#050505';g.fillRect(0,0,2048,96);
   g.font='800 52px Pretendard, sans-serif';g.textBaseline='middle';g.textAlign='left';let x=20;
-  const parts=[['BTC/USDT ',bd[0].v+' '+(bd[0].s.split(' ')[0]||''),bd[0].c],['UPBIT ',bd[1].v,bd[1].c],['KIMP ',bd[2].v,'#fcd535'],['ATH 대비 ',bd[3].v,'#f6465d'],['저점 대비 ',bd[4].v,'#0ecb81']];
-  for(const [a,b,c] of parts){g.fillStyle='#fcd535';g.fillText(a,x,50);x+=g.measureText(a).width;g.fillStyle=c;g.fillText(b,x,50);x+=g.measureText(b).width+30;
+  const parts=[['BTC/USDT ',bd[0].v+' '+(bd[0].s.split(' ')[0]||''),bd[0].c],['UPBIT ',bd[1].v,bd[1].c],['KIMP ',bd[2].v,'#ffd23a'],['ATH 대비 ',bd[3].v,DN],['저점 대비 ',bd[4].v,UP]];
+  for(const [a,b,c] of parts){g.fillStyle='#ffd23a';g.fillText(a,x,50);x+=g.measureText(a).width;g.fillStyle=c;g.fillText(b,x,50);x+=g.measureText(b).width+30;
     g.fillStyle='#555';g.fillText('◆',x,50);x+=60}
   tickT.needsUpdate=true}
-
-/* 시세 전광판 */
-const boardSpots=[[-10,-7],[-5,-9.5],[0,-10.3],[5,-9.5],[10,-7]];
-const boardObjs=boardSpots.map(([x,z])=>{
-  const g=new THREE.Group();g.position.set(x,0,z);g.rotation.y=Math.atan2(-x,3-z);scene.add(g);
-  const can=document.createElement('canvas');can.width=512;can.height=300;
-  const tex=new THREE.CanvasTexture(can);tex.colorSpace=THREE.SRGBColorSpace;tex.anisotropy=4;
-  const face=new THREE.MeshBasicMaterial({map:tex}),side=M('#20242b');
-  box(.25,3.4,.25,'#30343b',-1.9,1.7,0,g);box(.25,3.4,.25,'#30343b',1.9,1.7,0,g);
-  const p=new THREE.Mesh(BOX,[side,side,side,side,face,side]);p.scale.set(4.4,2.6,.25);p.position.set(0,3.8,0);g.add(p);
-  box(4.5,.08,.3,glow('#fcd535'),0,5.12,0,g);
-  const lamp=box(.25,.25,.25,glow('#fcd535'),0,5.35,0,g);
-  const c=Math.cos(g.rotation.y),s=Math.sin(g.rotation.y);
-  colliders.push({x:x-1.9*c,z:z+1.9*s,r:.35},{x:x+1.9*c,z:z-1.9*s,r:.35});
-  return{g,can,tex,lamp,x,z}});
-function drawBoard(b,d){const g=b.can.getContext('2d'),W=512,Hh=300;
-  g.fillStyle='#000';g.fillRect(0,0,W,Hh);
-  g.fillStyle='#0b0e11';g.fillRect(6,6,W-12,Hh-12);
-  g.fillStyle='#fcd535';g.font='800 28px Pretendard, sans-serif';g.textAlign='left';g.textBaseline='middle';g.fillText(d.t,26,40);
-  g.fillStyle='#2b3139';g.fillRect(26,66,W-52,2);
-  g.fillStyle=d.c;let fs=84;g.font='800 '+fs+'px Pretendard, sans-serif';while(g.measureText(d.v).width>W-52&&fs>40){fs-=4;g.font='800 '+fs+'px Pretendard, sans-serif'}
-  g.textAlign='center';g.fillText(d.v,W/2,158);g.fillStyle='#9aa3ae';g.font='600 27px Pretendard, sans-serif';g.fillText(d.s,W/2,242);
-  for(let y=6;y<Hh;y+=4){g.fillStyle='#00000030';g.fillRect(6,y,W-12,1)}
-  b.tex.needsUpdate=true}
 
 /* 황소 · 곰 조형물 (블록) */
 function bull(x,z){const g=new THREE.Group();g.position.set(x,0,z);g.rotation.y=.5;scene.add(g);const br='#9a6b33',dk='#6e4a22';
@@ -271,7 +299,7 @@ function avatar(suit){
 function animate(a,dt,moving,air){a.walk=moving?a.walk+dt*9:a.walk*.85;const sw=Math.sin(a.walk)*.7;
   a.legL.rotation.x=sw;a.legR.rotation.x=-sw;a.armL.rotation.x=-sw*.8;a.armR.rotation.x=sw*.5-(air?.8:0);
   a.head.position.y=1.75+Math.abs(Math.sin(a.walk))*.04;a.sh.position.set(a.P.position.x,.01,a.P.position.z);a.sh.scale.setScalar(1-Math.min(.5,a.P.position.y*.15))}
-const me=avatar('#1f2a44');const P=me.P;P.position.set(0,0,2);
+const me=avatar('#1f2a44');const P=me.P;P.position.set(0,0,3);
 
 /* ================= 코인 ================= */
 const coinGeo=new THREE.CylinderGeometry(.38,.38,.1,20);coinGeo.rotateX(Math.PI/2);
@@ -344,7 +372,9 @@ addEventListener('pagehide',()=>{pub('bye',{id:myId})});
 const bar=$('bar'),msg=$('msg');
 function openChat(){bar.classList.add('on');msg.focus()}
 function closeChat(){bar.classList.remove('on');msg.blur()}
-$('chatBtn').addEventListener('click',openChat);$('barX').addEventListener('click',closeChat);
+$('chatBtn').addEventListener('click',openChat);
+$('boardBtn').addEventListener('click',()=>{$('big').classList.add('on');$('bigC').getContext('2d').drawImage(BC,0,0)});
+$('bigX').addEventListener('click',()=>$('big').classList.remove('on'));$('barX').addEventListener('click',closeChat);
 bar.addEventListener('submit',e=>{e.preventDefault();const t=msg.value.trim().slice(0,80);if(!t){closeChat();return}
   msg.value='';say(myTag,t);log(myName,t);if(online)pub('chat',{id:myId,n:myName,t});else log('','아직 채팅 서버에 연결 중이에요',true);closeChat()});
 
@@ -365,7 +395,7 @@ joy.addEventListener('pointerup',joyEnd);joy.addEventListener('pointercancel',jo
 let vy=0,onGround=true;
 function jump(){if(onGround){vy=7.2;onGround=false}}
 $('jump').addEventListener('pointerdown',e=>{e.preventDefault();jump()});
-let yaw=0,pitch=.48,dragId=null,lx=0,ly=0,zoom=10;
+let yaw=0,pitch=.32,dragId=null,lx=0,ly=0,zoom=11;
 cv.addEventListener('pointerdown',e=>{if(bar.classList.contains('on'))closeChat();dragId=e.pointerId;lx=e.clientX;ly=e.clientY;cv.setPointerCapture(e.pointerId)});
 cv.addEventListener('pointermove',e=>{if(e.pointerId!==dragId)return;yaw-=(e.clientX-lx)*.006;pitch=Math.max(.2,Math.min(1.2,pitch+(e.clientY-ly)*.004));lx=e.clientX;ly=e.clientY});
 const dragEnd=e=>{if(e.pointerId===dragId)dragId=null};
@@ -403,7 +433,7 @@ function loop(){
     if(Math.abs(dx)<1.55&&Math.abs(dz)<.95&&P.position.y<1.3){P.position.z=c.g.position.z+(dz>=0?.96:-.96);if(onGround){vy=4;onGround=false}}}
   animate(me,dt,moving,!onGround);
   const cx=P.position.x+Math.sin(yaw)*Math.cos(pitch)*zoom,cz=P.position.z+Math.cos(yaw)*Math.cos(pitch)*zoom,cy=P.position.y+1+Math.sin(pitch)*zoom;
-  cam.position.lerp(camT.set(cx,cy,cz),Math.min(1,dt*8));cam.lookAt(P.position.x,P.position.y+2,P.position.z);
+  cam.position.lerp(camT.set(cx,cy,cz),Math.min(1,dt*8));cam.lookAt(P.position.x,P.position.y+3.2,P.position.z);
   const now=performance.now();
   for(const [id,o] of others){if(now-o.seen>12000){drop(id);continue}
     const p=o.a.P.position,k=Math.min(1,dt*10),dx=o.tx-p.x,dz=o.tz-p.z;
@@ -417,12 +447,8 @@ function loop(){
   for(let i=sparks.length-1;i>=0;i--){const s=sparks[i];s.userData.t+=dt;s.userData.v.y-=14*dt;s.position.addScaledVector(s.userData.v,dt);s.rotation.x+=dt*8;
     if(s.userData.t>.7){scene.remove(s);sparks.splice(i,1)}}
   tickT.offset.x=(tickT.offset.x+dt*.06)%1;
-  if(dirty&&t-lastDraw>.5){const bd=boards();boardObjs.forEach((b,i)=>drawBoard(b,bd[i]));drawTicker();lastDraw=t;dirty=false;if(near>=0)showPop(near,bd)}
-  let best=-1,bdist=4.2;boardObjs.forEach((b,i)=>{const d=Math.hypot(b.x-P.position.x,b.z-P.position.z);if(d<bdist){bdist=d;best=i}
-    b.lamp.scale.setScalar(.25+(i===best?Math.abs(Math.sin(t*6))*.15:0))});
-  if(best!==near){near=best;if(near<0)$('pop').classList.remove('on');else showPop(near,boards())}
+  if((dirty&&t-lastDraw>.5)||t-lastDraw>1){drawBig();drawTicker();lastDraw=t;dirty=false}
   R.render(scene,cam);requestAnimationFrame(loop)}
-function showPop(i,bd){const d=bd[i];$('pt').textContent=d.t;$('pv').textContent=d.v;$('pv').style.color=d.c;$('ps').textContent=d.s;$('pop').classList.add('on')}
 document.fonts&&document.fonts.ready.then(()=>{dirty=true});
 requestAnimationFrame(loop);
 }
