@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#8fd3ff">
+<title>BTC 마을</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;overflow:hidden;background:#8fd3ff;font-family:Pretendard,system-ui,sans-serif;color:#fff;user-select:none;-webkit-user-select:none}
+#c{position:fixed;inset:0;width:100%;height:100%;touch-action:none;display:block}
+.hud{position:fixed;left:0;right:0;top:0;padding:max(10px,env(safe-area-inset-top)) 12px 0;display:flex;gap:8px;align-items:flex-start;pointer-events:none}
+.chip{background:#000a;border:3px solid #000;box-shadow:inset 0 -4px 0 #0006,inset 0 3px 0 #ffffff22;border-radius:6px;padding:6px 10px;font-weight:800;font-size:15px;white-space:nowrap}
+.chip b{color:#fcd535}
+.chip.r{margin-left:auto}
+.back{pointer-events:auto;color:#fff;text-decoration:none}
+#pop{position:fixed;left:50%;top:calc(max(10px,env(safe-area-inset-top)) + 52px);transform:translate(-50%,-10px);min-width:250px;max-width:92vw;background:#181a20f2;border:4px solid #000;outline:3px solid #fcd535;border-radius:8px;padding:12px 16px;text-align:center;opacity:0;transition:.18s;pointer-events:none}
+#pop.on{opacity:1;transform:translate(-50%,0)}
+#pop .t{font-size:13px;color:#fcd535;font-weight:800}
+#pop .v{font-size:32px;font-weight:900;line-height:1.15;margin:2px 0;font-variant-numeric:tabular-nums}
+#pop .s{font-size:13px;color:#c9ced6}
+.g{color:#3ee08f}.rd{color:#ff5a6e}
+#joy{position:fixed;left:calc(18px + env(safe-area-inset-left));bottom:calc(22px + env(safe-area-inset-bottom));width:132px;height:132px;border-radius:50%;background:#0004;border:4px solid #0006;touch-action:none}
+#knob{position:absolute;left:50%;top:50%;width:58px;height:58px;margin:-29px 0 0 -29px;border-radius:12px;background:#fcd535;border:4px solid #000;box-shadow:inset 0 -6px 0 #c99a00}
+#jump{position:fixed;right:calc(22px + env(safe-area-inset-right));bottom:calc(36px + env(safe-area-inset-bottom));width:88px;height:88px;border-radius:14px;background:#3ee08f;border:4px solid #000;box-shadow:inset 0 -8px 0 #1f9e5f;font:900 18px Pretendard;color:#063;touch-action:none}
+#jump:active{transform:translateY(3px);box-shadow:inset 0 -4px 0 #1f9e5f}
+.help{position:fixed;left:50%;bottom:calc(8px + env(safe-area-inset-bottom));transform:translateX(-50%);font-size:12px;color:#0009;font-weight:700;white-space:nowrap;pointer-events:none}
+#load{position:fixed;inset:0;display:grid;place-items:center;background:#8fd3ff;color:#123;font-weight:900;font-size:20px;z-index:9}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div class="hud">
+  <a class="chip back" href="./">← 현황판</a>
+  <div class="chip">BTC <b id="hp">–</b></div>
+  <div class="chip r">코인 <b id="score">0</b></div>
+</div>
+<div id="pop"><div class="t" id="pt"></div><div class="v" id="pv"></div><div class="s" id="ps"></div></div>
+<div id="joy"><div id="knob"></div></div>
+<button id="jump" aria-label="점프">점프</button>
+<div class="help" id="help">조이스틱으로 이동 · 화면 드래그로 시점 회전 · 전광판에 다가가 보세요</div>
+<div id="load">BTC 마을 불러오는 중…</div>
+<script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
+<script>
+{
+const $=id=>document.getElementById(id);
+if(!window.THREE){$('load').textContent='3D 엔진을 불러오지 못했어요. 새로고침해 주세요.';throw 0}
+
+/* ================= 시세 데이터 ================= */
+const D={bn:0,bnP:0,ub:0,ubP:0,usdt:0};
+const KEY='btc-athlow-v1',BASE={ath:126273,athDate:'2025-10-06',low:55130,lowDate:'2026-11-21'};
+let S={...BASE};
+try{const s=JSON.parse(localStorage.getItem(KEY)||'null');if(s&&s.ath>=BASE.ath)S=s}catch(e){}
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
+const todayKST=()=>new Date(Date.now()+9*3600000).toISOString().slice(0,10);
+const dayN=s=>Date.UTC(+s.slice(0,4),+s.slice(5,7)-1,+s.slice(8,10))/86400000;
+const fmtD=s=>s.slice(0,4)+'.'+(+s.slice(5,7))+'.'+(+s.slice(8,10));
+const sign=v=>(v>=0?'+':'')+v.toFixed(2)+'%';
+const usd=v=>'$'+Math.round(v).toLocaleString('en-US');
+const krw=v=>'₩'+Math.round(v).toLocaleString('ko-KR');
+function newPrice(p,d){if(p>S.ath){S.ath=p;S.athDate=d;S.low=null;S.lowDate=null;return true}
+  if(d>S.athDate&&(S.low==null||p<S.low)){S.low=p;S.lowDate=d;return true}return false}
+let dirty=true;
+function onBn(c,P){D.bn=c;D.bnP=P;$('hp').textContent=usd(c);if(newPrice(c,todayKST()))save();dirty=true}
+function upbit(){let ws;try{ws=new WebSocket('wss://api.upbit.com/websocket/v1')}catch(e){return}
+  ws.binaryType='arraybuffer';
+  ws.onopen=()=>ws.send(JSON.stringify([{ticket:'v-'+Date.now()},{type:'ticker',codes:['KRW-BTC','KRW-USDT']}]));
+  ws.onmessage=e=>{try{const x=JSON.parse(typeof e.data==='string'?e.data:new TextDecoder().decode(e.data));
+    if(x.code==='KRW-BTC'){D.ub=x.trade_price;D.ubP=x.signed_change_rate*100}if(x.code==='KRW-USDT')D.usdt=x.trade_price;dirty=true}catch(er){}};
+  ws.onclose=()=>setTimeout(upbit,3000)}
+const bnUrls=['wss://stream.binance.com:9443/ws/btcusdt@ticker','wss://data-stream.binance.vision/ws/btcusdt@ticker'];let bi=0,got=false;
+function binance(){let ws;try{ws=new WebSocket(bnUrls[bi%2])}catch(e){return}
+  ws.onmessage=e=>{try{const x=JSON.parse(e.data);got=true;onBn(+x.c,+x.P)}catch(er){}};
+  ws.onclose=()=>{if(!got)bi++;setTimeout(binance,3000)}}
+async function sync(){for(const h of['https://api.binance.com','https://data-api.binance.vision']){
+  try{const r=await fetch(h+'/api/v3/klines?symbol=BTCUSDT&interval=1d&limit=1000&startTime='+Date.UTC(2025,9,6));if(!r.ok)continue;
+    let ch=false;for(const k of await r.json()){const d=new Date(k[0]).toISOString().slice(0,10);if(d<S.athDate)continue;
+      if(+k[2]>S.ath){S.ath=+k[2];S.athDate=d;S.low=null;S.lowDate=null;ch=true;continue}
+      if(d>S.athDate&&(S.low==null||+k[3]<S.low)){S.low=+k[3];S.lowDate=d;ch=true}}
+    if(ch)save();dirty=true;return}catch(e){}}}
+upbit();binance();sync();setInterval(sync,600000);
+
+/* 전광판 내용 */
+function boards(){
+  const k=D.ub&&D.bn&&D.usdt?(D.ub/(D.bn*D.usdt)-1)*100:null,t=dayN(todayKST());
+  const dd=D.bn?(D.bn/S.ath-1)*100:null,fl=D.bn&&S.low?(D.bn/S.low-1)*100:null;
+  return[
+    {t:'바이낸스 BTC',v:D.bn?usd(D.bn):'연결 중',s:D.bn?sign(D.bnP)+' (24h)':'',c:D.bnP>=0?'#3ee08f':'#ff5a6e',col:'#fcd535'},
+    {t:'업비트 BTC',v:D.ub?krw(D.ub):'연결 중',s:D.ub?sign(D.ubP)+' (24h)':'',c:D.ubP>=0?'#3ee08f':'#ff5a6e',col:'#4f8cff'},
+    {t:'김치프리미엄',v:k==null?'계산 중':sign(k),s:D.usdt?'USDT '+krw(D.usdt):'',c:'#fcd535',col:'#ff9f1a'},
+    {t:'ATH '+usd(S.ath),v:dd==null?'–':sign(dd),s:fmtD(S.athDate)+' · '+(t-dayN(S.athDate))+'일 지남',c:'#ff5a6e',col:'#ff5a6e'},
+    {t:'ATH 이후 저점 '+(S.low?usd(S.low):'–'),v:fl==null?'–':sign(fl),s:S.low?fmtD(S.lowDate)+' · ATH 후 '+(dayN(S.lowDate)-dayN(S.athDate))+'일째':'',c:'#3ee08f',col:'#3ee08f'}]}
+
+/* ================= 3D 월드 ================= */
+const cv=$('c');
+const R=new THREE.WebGLRenderer({canvas:cv,antialias:true});
+R.setPixelRatio(Math.min(2,devicePixelRatio||1));
+const scene=new THREE.Scene();
+scene.background=new THREE.Color('#8fd3ff');scene.fog=new THREE.Fog('#8fd3ff',28,58);
+const cam=new THREE.PerspectiveCamera(55,1,.1,200);
+scene.add(new THREE.HemisphereLight('#ffffff','#5a7d3a',1.1));
+const sun=new THREE.DirectionalLight('#fff4d6',1.4);sun.position.set(12,20,8);scene.add(sun);
+const M=c=>new THREE.MeshLambertMaterial({color:c});
+const BOX=new THREE.BoxGeometry(1,1,1);
+function box(w,h,d,c,x,y,z,parent){const m=new THREE.Mesh(BOX,typeof c==='string'?M(c):c);m.scale.set(w,h,d);m.position.set(x,y,z);(parent||scene).add(m);return m}
+
+/* 픽셀 텍스처 (잔디/흙) */
+function pixTex(base,dots){const c=document.createElement('canvas');c.width=c.height=16;const g=c.getContext('2d');g.fillStyle=base;g.fillRect(0,0,16,16);
+  for(let i=0;i<40;i++){g.fillStyle=dots[i%dots.length];g.fillRect((Math.random()*16)|0,(Math.random()*16)|0,1+(Math.random()*2|0),1)}
+  const t=new THREE.CanvasTexture(c);t.magFilter=THREE.NearestFilter;t.minFilter=THREE.NearestFilter;t.colorSpace=THREE.SRGBColorSpace;return t}
+const grassTop=new THREE.MeshLambertMaterial({map:pixTex('#6cc04a',['#5aad3c','#7fd35a','#4f9a35'])});
+const dirt=new THREE.MeshLambertMaterial({map:pixTex('#8a5a33',['#7a4e2b','#9b6a40','#6b4425'])});
+const path=new THREE.MeshLambertMaterial({map:pixTex('#c9b27a',['#b89f66','#d8c48d','#a88f58'])});
+const N=44,H=N/2;
+const tiles=new THREE.InstancedMesh(BOX,[dirt,dirt,grassTop,dirt,dirt,dirt],N*N);
+const pathT=new THREE.InstancedMesh(BOX,path,N*N);
+let gi=0,pi=0;const mtx=new THREE.Matrix4();
+const isPath=(x,z)=>(Math.abs(x)<1.2&&z<2&&z>-12)||(Math.abs(z+9)<1.2&&Math.abs(x)<12);
+for(let x=-H;x<H;x++)for(let z=-H;z<H;z++){mtx.makeTranslation(x+.5,-.5,z+.5);
+  if(isPath(x+.5,z+.5))pathT.setMatrixAt(pi++,mtx);else tiles.setMatrixAt(gi++,mtx)}
+tiles.count=gi;pathT.count=pi;scene.add(tiles,pathT);
+/* 바다 */
+const sea=new THREE.Mesh(new THREE.PlaneGeometry(300,300),M('#3a9bdc'));sea.rotation.x=-Math.PI/2;sea.position.y=-.9;scene.add(sea);
+
+const colliders=[];
+/* 나무 */
+function tree(x,z,s=1){const g=new THREE.Group();g.position.set(x,0,z);scene.add(g);
+  box(.6,2.2*s,.6,'#7a4e2b',0,1.1*s,0,g);box(2.2,1.4,2.2,'#2f8f3a',0,2.6*s,0,g);box(1.4,.9,1.4,'#3fae48',0,3.6*s,0,g);
+  colliders.push({x,z,r:.6})}
+[[-6,4],[-13,-3],[13,-2],[7,6],[-15,10],[15,12],[-4,14],[10,15],[-17,-14],[17,-15],[0,17],[-10,-16],[11,-17]].forEach((p,i)=>tree(p[0],p[1],1+(i%3)*.15));
+/* 구름 */
+const clouds=[];for(let i=0;i<9;i++){const g=new THREE.Group();g.position.set((Math.random()-.5)*70,14+Math.random()*5,(Math.random()-.5)*70-10);
+  const w=M('#ffffff');for(let j=0;j<3+i%3;j++)box(2+Math.random()*2,.8,1.6+Math.random()*1.5,w,j*1.6-2,Math.random()*.4,Math.random()-.5,g);scene.add(g);clouds.push(g)}
+/* 돌·꽃 */
+for(let i=0;i<26;i++){const x=(Math.random()-.5)*38,z=(Math.random()-.5)*38;if(isPath(x,z)||Math.hypot(x,z+9)<5)continue;
+  if(i%3)box(.25,.35,.25,['#ff5a6e','#fcd535','#ffffff'][i%3],x,.17,z);else box(.9,.6,.8,'#9aa3ae',x,.3,z)}
+
+/* 전광판 */
+const boardSpots=[[-10,-9],[-5,-12],[0,-13],[5,-12],[10,-9]];
+const boardObjs=boardSpots.map(([x,z],i)=>{
+  const g=new THREE.Group();g.position.set(x,0,z);g.rotation.y=Math.atan2(-x,2-z);scene.add(g);
+  const can=document.createElement('canvas');can.width=512;can.height=300;
+  const tex=new THREE.CanvasTexture(can);tex.colorSpace=THREE.SRGBColorSpace;tex.anisotropy=4;
+  const face=new THREE.MeshBasicMaterial({map:tex});const side=M('#2b3139');
+  box(.35,3.2,.35,'#5a3a1f',-1.9,1.6,0,g);box(.35,3.2,.35,'#5a3a1f',1.9,1.6,0,g);
+  const p=new THREE.Mesh(BOX,[side,side,side,side,face,side]);p.scale.set(4.4,2.6,.3);p.position.set(0,3.6,0);g.add(p);
+  box(4.6,.3,.5,'#3a3f47',0,4.95,0,g);
+  const lamp=box(.3,.3,.3,'#fcd535',0,5.25,0,g);
+  colliders.push({x:x-1.9*Math.cos(g.rotation.y),z:z+1.9*Math.sin(g.rotation.y),r:.4},{x:x+1.9*Math.cos(g.rotation.y),z:z-1.9*Math.sin(g.rotation.y),r:.4});
+  return{g,can,tex,lamp,x,z}});
+function drawBoard(b,d){const g=b.can.getContext('2d'),W=512,Hh=300;
+  g.fillStyle='#000';g.fillRect(0,0,W,Hh);g.fillStyle='#181a20';g.fillRect(10,10,W-20,Hh-20);
+  g.fillStyle=d.col;g.fillRect(10,10,W-20,54);
+  for(let x=10;x<W-10;x+=16){g.fillStyle='#00000022';g.fillRect(x,10,8,54)}
+  g.fillStyle='#000';g.font='900 30px Pretendard, sans-serif';g.textAlign='center';g.textBaseline='middle';g.fillText(d.t,W/2,38);
+  g.fillStyle=d.c;let fs=86;g.font='900 '+fs+'px Pretendard, sans-serif';while(g.measureText(d.v).width>W-50&&fs>40){fs-=4;g.font='900 '+fs+'px Pretendard, sans-serif'}
+  g.fillText(d.v,W/2,150);g.fillStyle='#c9ced6';g.font='700 28px Pretendard, sans-serif';g.fillText(d.s,W/2,240);
+  b.tex.needsUpdate=true}
+
+/* ================= 캐릭터 (오리지널 블록 광부) ================= */
+const P=new THREE.Group();scene.add(P);P.position.set(0,0,2);
+const skin='#f2c79b';
+const legL=new THREE.Group(),legR=new THREE.Group(),armL=new THREE.Group(),armR=new THREE.Group();
+legL.position.set(-.16,.75,0);legR.position.set(.16,.75,0);armL.position.set(-.45,1.42,0);armR.position.set(.45,1.42,0);P.add(legL,legR,armL,armR);
+box(.28,.75,.3,'#2d4fa3',0,-.37,0,legL);box(.28,.75,.3,'#2d4fa3',0,-.37,0,legR);
+box(.3,.15,.36,'#3a2a1a',0,-.7,.03,legL);box(.3,.15,.36,'#3a2a1a',0,-.7,.03,legR);
+box(.62,.72,.36,'#f7931a',0,1.1,0,P);box(.64,.12,.38,'#7a4e2b',0,.8,0,P);
+box(.2,.42,.2,'#f7931a',0,-.18,0,armL);box(.2,.42,.2,'#f7931a',0,-.18,0,armR);
+box(.2,.28,.2,skin,0,-.52,0,armL);box(.2,.28,.2,skin,0,-.52,0,armR);
+const head=new THREE.Group();head.position.set(0,1.75,0);P.add(head);
+box(.56,.56,.56,skin,0,0,0,head);
+box(.09,.12,.02,'#1a1a1a',-.13,.02,.285,head);box(.09,.12,.02,'#1a1a1a',.13,.02,.285,head);
+box(.2,.05,.02,'#a0522d',0,-.15,.285,head);
+box(.62,.22,.62,'#fcd535',0,.3,0,head);box(.66,.06,.7,'#e0b800',0,.2,.03,head);
+box(.16,.14,.06,'#fffbe0',0,.3,.32,head);
+/* 곡괭이 */
+const pick=new THREE.Group();pick.position.set(0,-.62,.1);armR.add(pick);
+box(.07,.07,.8,'#7a4e2b',0,0,.35,pick);box(.5,.1,.1,'#b8c2cc',0,0,.72,pick);
+/* 그림자 */
+const sh=new THREE.Mesh(new THREE.CircleGeometry(.45,16),new THREE.MeshBasicMaterial({color:'#000',transparent:true,opacity:.25}));sh.rotation.x=-Math.PI/2;sh.position.y=.01;scene.add(sh);
+
+/* ================= 코인 모으기 ================= */
+const coinGeo=new THREE.CylinderGeometry(.38,.38,.1,20);coinGeo.rotateX(Math.PI/2);
+const coinMat=new THREE.MeshLambertMaterial({color:'#fcd535',emissive:'#6b5200'});
+const coins=[];let score=0;
+try{score=+localStorage.getItem('btc-village-score')||0}catch(e){}
+$('score').textContent=score;
+function placeCoin(c){for(let i=0;i<30;i++){const x=(Math.random()-.5)*36,z=(Math.random()-.5)*36;
+  if(colliders.every(o=>Math.hypot(o.x-x,o.z-z)>1.4)&&Math.hypot(x-P.position.x,z-P.position.z)>4){c.position.set(x,.9,z);return}}}
+for(let i=0;i<14;i++){const c=new THREE.Mesh(coinGeo,coinMat);placeCoin(c);scene.add(c);coins.push(c)}
+const sparks=[];
+function burst(p){for(let i=0;i<10;i++){const s=box(.12,.12,.12,'#fcd535',p.x,p.y,p.z);s.userData.v=new THREE.Vector3((Math.random()-.5)*5,3+Math.random()*3,(Math.random()-.5)*5);s.userData.t=0;sparks.push(s)}}
+
+/* ================= 조작 ================= */
+const keys={};
+addEventListener('keydown',e=>{keys[e.code]=true;if(e.code==='Space')jump()});
+addEventListener('keyup',e=>{keys[e.code]=false});
+let jx=0,jz=0,joyId=null;
+const joy=$('joy'),knob=$('knob');
+function joyMove(e){const r=joy.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2;
+  let dx=e.clientX-cx,dy=e.clientY-cy;const m=Math.hypot(dx,dy),max=r.width/2-14;if(m>max){dx*=max/m;dy*=max/m}
+  knob.style.transform='translate('+dx+'px,'+dy+'px)';jx=dx/max;jz=dy/max}
+joy.addEventListener('pointerdown',e=>{joyId=e.pointerId;joy.setPointerCapture(e.pointerId);joyMove(e)});
+joy.addEventListener('pointermove',e=>{if(e.pointerId===joyId)joyMove(e)});
+const joyEnd=e=>{if(e.pointerId!==joyId)return;joyId=null;jx=jz=0;knob.style.transform=''};
+joy.addEventListener('pointerup',joyEnd);joy.addEventListener('pointercancel',joyEnd);
+let vy=0,onGround=true;
+function jump(){if(onGround){vy=7.2;onGround=false}}
+$('jump').addEventListener('pointerdown',e=>{e.preventDefault();jump()});
+/* 시점 회전: 화면 드래그 */
+let yaw=0,pitch=.5,dragId=null,lx=0,ly=0,zoom=10;
+cv.addEventListener('pointerdown',e=>{dragId=e.pointerId;lx=e.clientX;ly=e.clientY;cv.setPointerCapture(e.pointerId)});
+cv.addEventListener('pointermove',e=>{if(e.pointerId!==dragId)return;yaw-=(e.clientX-lx)*.006;pitch=Math.max(.25,Math.min(1.2,pitch+(e.clientY-ly)*.004));lx=e.clientX;ly=e.clientY});
+const dragEnd=e=>{if(e.pointerId===dragId)dragId=null};
+cv.addEventListener('pointerup',dragEnd);cv.addEventListener('pointercancel',dragEnd);
+cv.addEventListener('wheel',e=>{zoom=Math.max(5,Math.min(16,zoom+e.deltaY*.01))},{passive:true});
+
+/* ================= 루프 ================= */
+function resize(){const w=innerWidth,h=innerHeight;R.setSize(w,h,false);cam.aspect=w/h;cam.fov=w<h?68:55;cam.updateProjectionMatrix()}
+addEventListener('resize',resize);resize();
+const clock=new THREE.Clock();let walkT=0,lastDraw=0,near=-1,helpHidden=false;
+function loop(){
+  const dt=Math.min(.05,clock.getDelta()),t=clock.elapsedTime;
+  /* 입력 */
+  let ix=jx,iz=jz;
+  if(keys.KeyA||keys.ArrowLeft)ix-=1;if(keys.KeyD||keys.ArrowRight)ix+=1;
+  if(keys.KeyW||keys.ArrowUp)iz-=1;if(keys.KeyS||keys.ArrowDown)iz+=1;
+  const mag=Math.min(1,Math.hypot(ix,iz));
+  if(mag>.08){
+    if(!helpHidden){helpHidden=true;$('help').style.opacity=0}
+    const a=Math.atan2(ix,iz)+yaw,sp=5.2*mag;
+    const dx=Math.sin(a)*sp*dt,dz=Math.cos(a)*sp*dt;
+    P.position.x+=dx;P.position.z+=dz;
+    const targ=Math.atan2(dx,dz);let d=targ-P.rotation.y;d=Math.atan2(Math.sin(d),Math.cos(d));P.rotation.y+=d*Math.min(1,dt*12);
+    walkT+=dt*9*mag}else walkT*=.85;
+  for(const o of colliders){const dx=P.position.x-o.x,dz=P.position.z-o.z,d=Math.hypot(dx,dz),m=o.r+.35;if(d<m&&d>0){P.position.x=o.x+dx/d*m;P.position.z=o.z+dz/d*m}}
+  P.position.x=Math.max(-H+.6,Math.min(H-.6,P.position.x));P.position.z=Math.max(-H+.6,Math.min(H-.6,P.position.z));
+  vy-=20*dt;P.position.y+=vy*dt;if(P.position.y<=0){P.position.y=0;vy=0;onGround=true}
+  const sw=Math.sin(walkT)*.7;legL.rotation.x=sw;legR.rotation.x=-sw;armL.rotation.x=-sw*.8;armR.rotation.x=sw*.8-(onGround?0:.9);
+  head.position.y=1.75+Math.abs(Math.sin(walkT))*.04;
+  sh.position.set(P.position.x,.01,P.position.z);sh.scale.setScalar(1-Math.min(.5,P.position.y*.15));
+  /* 카메라 */
+  const cx=P.position.x+Math.sin(yaw)*Math.cos(pitch)*zoom,cz=P.position.z+Math.cos(yaw)*Math.cos(pitch)*zoom,cy=P.position.y+1+Math.sin(pitch)*zoom;
+  cam.position.lerp(new THREE.Vector3(cx,cy,cz),Math.min(1,dt*8));cam.lookAt(P.position.x,P.position.y+2,P.position.z);
+  for(const c of clouds){c.position.x+=dt*.6;if(c.position.x>40)c.position.x=-40}
+  /* 코인 */
+  for(const c of coins){c.rotation.y+=dt*3;c.position.y=.9+Math.sin(t*2+c.position.x)*.12;
+    if(Math.hypot(c.position.x-P.position.x,c.position.z-P.position.z)<.8&&Math.abs(c.position.y-(P.position.y+.9))<1.2){
+      burst(c.position);score++;$('score').textContent=score;try{localStorage.setItem('btc-village-score',score)}catch(e){}placeCoin(c)}}
+  for(let i=sparks.length-1;i>=0;i--){const s=sparks[i];s.userData.t+=dt;s.userData.v.y-=14*dt;s.position.addScaledVector(s.userData.v,dt);s.rotation.x+=dt*8;
+    if(s.userData.t>.7){scene.remove(s);sparks.splice(i,1)}}
+  /* 전광판 */
+  if(dirty&&t-lastDraw>.5){const bd=boards();boardObjs.forEach((b,i)=>drawBoard(b,bd[i]));lastDraw=t;dirty=false;if(near>=0)showPop(near,bd)}
+  let best=-1,bdist=4.2;boardObjs.forEach((b,i)=>{b.lamp.material.emissive=b.lamp.material.emissive||new THREE.Color();
+    const d=Math.hypot(b.x-P.position.x,b.z-P.position.z);if(d<bdist){bdist=d;best=i}
+    b.lamp.scale.setScalar(.3+(i===best?Math.abs(Math.sin(t*6))*.15:0))});
+  if(best!==near){near=best;if(near<0)$('pop').classList.remove('on');else showPop(near,boards())}
+  R.render(scene,cam);requestAnimationFrame(loop)}
+function showPop(i,bd){const d=bd[i];$('pt').textContent=d.t;$('pv').textContent=d.v;$('pv').style.color=d.c;$('ps').textContent=d.s;$('pop').classList.add('on')}
+document.fonts&&document.fonts.ready.then(()=>{dirty=true});
+$('load').remove();
+requestAnimationFrame(loop);
+}
+</script>
+</body>
+</html>
