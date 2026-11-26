@@ -35,7 +35,7 @@ body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 Pretendard,sys
 .lift{transform:translateZ(24px)}
 
 /* 가격 헤더 */
-.head{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:14px;align-items:center}
+.head{display:block}
 .price{font:600 clamp(32px,9vw,44px)/1.05 "IBM Plex Sans",Pretendard,system-ui,sans-serif;letter-spacing:-.02em;transition:color .2s}
 .fiat{font-size:13px;color:var(--mute);margin-top:4px}
 .chgp{display:inline-block;margin-top:8px;font:600 13px "IBM Plex Sans",Pretendard,system-ui,sans-serif;padding:3px 8px;border-radius:6px}
@@ -99,15 +99,8 @@ body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 Pretendard,sys
         <div class="fiat n" id="fiat">&nbsp;</div>
         <span class="chgp n" id="bnc">–</span>
       </div>
-      <div class="s24">
-        <div><span>24h 고가</span><span class="n" id="hi">–</span></div>
-        <div><span>24h 저가</span><span class="n" id="lo">–</span></div>
-        <div><span>24h 거래대금</span><span class="n" id="vol">–</span></div>
-        <div><span>ATH 대비</span><span class="n r" id="dd0">–</span></div>
-      </div>
     </div>
     <div class="tabs" role="tablist">
-      <button class="tab" data-tf="d" role="tab">1일봉 · 90일</button>
       <button class="tab on" data-tf="w" role="tab">1주봉 · ATH 이후</button>
       <span class="leg"><span class="y">┅</span> ATH</span>
     </div>
@@ -168,9 +161,7 @@ function setBn(x){
   const price=+x.c;bn=price;const el=$('bn');el.textContent=f2(price);
   el.className='price n '+(lastBn&&price<lastBn?'r':'g');lastBn=price;
   const p=+x.P,c=$('bnc');c.textContent=sign(p);c.className='chgp n '+(p>=0?'g':'r');
-  if(x.h)$('hi').textContent=f2(+x.h);if(x.l)$('lo').textContent=f2(+x.l);
-  if(x.q){const q=+x.q;$('vol').textContent=(q>=1e9?(q/1e9).toFixed(2)+'B':(q/1e6).toFixed(1)+'M')}
-  kimp();if(newPrice(price,todayKST()))save();drawAth();
+    kimp();if(newPrice(price,todayKST()))save();drawAth();
   if(K.length){const l=K[K.length-1];l[4]=price;if(price>l[2])l[2]=price;if(price<l[3])l[3]=price;drawChart()}}
 
 function drawAth(){
@@ -181,7 +172,7 @@ function drawAth(){
     $('eLow').textContent=usd(S.low);$('lowD').textContent='저점 이후 '+(t-dayN(S.lowDate))+'일 지남'}
   else{$('lowP').textContent='–';$('lowDt').textContent='새 ATH 이후 기록 대기';$('eLow').textContent='–'}
   if(!bn)return;
-  const dd=sign((bn/S.ath-1)*100);$('dd').firstChild.textContent=dd;$('dd0').textContent=dd;
+  const dd=sign((bn/S.ath-1)*100);$('dd').firstChild.textContent=dd;
   if(S.low!=null){$('fl').firstChild.textContent=sign((bn/S.low-1)*100);
     const pos=Math.max(0,Math.min(1,(bn-S.low)/(S.ath-S.low)))*100;
     $('mark').style.left=pos+'%';$('tip').style.left=Math.max(9,Math.min(91,pos))+'%';$('tip').textContent=usd(bn)}}
