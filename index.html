@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b0e11">
+<title>BTC/USDT 사이클 보드</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0b0e11;--p1:#181a20;--p2:#1e2329;--p3:#2b3139;--line:#2b3139;--ink:#eaecef;--mute:#848e9c;--y:#fcd535;--y2:#f0b90b;--g:#0ecb81;--r:#f6465d;--b:#3b82f6}
+*{box-sizing:border-box;min-width:0}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 Pretendard,system-ui,-apple-system,sans-serif;overflow-x:clip}
+.n{font-family:"IBM Plex Sans",Pretendard,sans-serif;font-variant-numeric:tabular-nums}
+.wrap{max-width:680px;margin:0 auto;padding:max(12px,env(safe-area-inset-top)) 12px calc(32px + env(safe-area-inset-bottom));perspective:1200px}
+.g{color:var(--g)}.r{color:var(--r)}.y{color:var(--y)}.m{color:var(--mute)}
+
+/* 상단 바 */
+.top{display:flex;align-items:center;gap:10px;padding:8px 4px 14px}
+.pair{font:700 20px "IBM Plex Sans",Pretendard,system-ui,sans-serif;letter-spacing:-.01em}
+.pair small{font:500 12px Pretendard;color:var(--mute);margin-left:6px;padding:1px 6px;border-radius:4px;background:var(--p3)}
+.live{margin-left:auto;font-size:12px;color:var(--mute);display:flex;align-items:center;gap:6px}
+.live i{width:6px;height:6px;border-radius:50%;background:#555}
+.live.on i{background:var(--g);box-shadow:0 0 8px var(--g)}
+.c3{width:30px;height:30px;position:relative;transform-style:preserve-3d;animation:spin 5s linear infinite;flex:none}
+.c3 span{position:absolute;inset:0;border-radius:50%}
+.c3 .f{background:radial-gradient(circle at 35% 30%,#ffe58a,#f0b90b 55%,#b98a06);display:grid;place-items:center;color:#1a1400;font:800 17px "IBM Plex Sans",Pretendard,system-ui,sans-serif}
+.c3 .f1{transform:translateZ(3px)}.c3 .f2{transform:rotateY(180deg) translateZ(3px)}.c3 .e{background:#9c7405}
+@keyframes spin{to{transform:rotateY(360deg)}}
+
+/* 패널 공통 + 3D */
+.pn{background:var(--p1);border-radius:14px;padding:16px;margin-bottom:10px;position:relative;transform-style:preserve-3d;transition:transform .18s ease-out;will-change:transform}
+.pn::after{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;background:radial-gradient(circle at var(--gx,50%) var(--gy,0%),#fcd53514,transparent 60%);opacity:var(--go,.6)}
+.lift{transform:translateZ(24px)}
+
+/* 가격 헤더 */
+.head{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:14px;align-items:center}
+.price{font:600 clamp(32px,9vw,44px)/1.05 "IBM Plex Sans",Pretendard,system-ui,sans-serif;letter-spacing:-.02em;transition:color .2s}
+.fiat{font-size:13px;color:var(--mute);margin-top:4px}
+.chgp{display:inline-block;margin-top:8px;font:600 13px "IBM Plex Sans",Pretendard,system-ui,sans-serif;padding:3px 8px;border-radius:6px}
+.chgp.g{background:#0ecb8122}.chgp.r{background:#f6465d22}
+.s24{display:grid;grid-template-columns:1fr;gap:6px;font-size:12px}
+.s24 div{display:flex;justify-content:space-between;gap:8px}
+.s24 span:first-child{color:var(--mute)}
+.s24 span:last-child{font:500 12.5px "IBM Plex Sans",Pretendard,system-ui,sans-serif;white-space:nowrap}
+
+/* 차트 */
+.tabs{display:flex;gap:4px;margin:16px 0 8px;border-bottom:1px solid var(--line)}
+.tab{appearance:none;background:none;border:0;color:var(--mute);font:600 14px Pretendard;padding:8px 12px;min-height:40px;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px}
+.tab.on{color:var(--ink);border-color:var(--y)}
+.tab:focus-visible{outline:2px solid var(--y)}
+.tabs .leg{margin-left:auto;align-self:center;font-size:11.5px;color:var(--mute)}
+.fig{position:relative;height:230px}
+.fig svg{position:absolute;inset:0;width:100%;height:100%}
+
+/* 업비트 · 김프 */
+.duo{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px}
+.duo .pn{margin:0 0 10px}
+.lb{font-size:12px;color:var(--mute);display:flex;align-items:center;gap:6px}
+.ex{width:16px;height:16px;border-radius:4px;display:inline-grid;place-items:center;font:700 10px "IBM Plex Sans",Pretendard,system-ui,sans-serif;color:#fff;background:#093687}
+.v{font:600 clamp(19px,5.6vw,24px)/1.25 "IBM Plex Sans",Pretendard,system-ui,sans-serif;margin-top:6px;white-space:nowrap}
+.sub{font:500 12px "IBM Plex Sans",Pretendard,system-ui,sans-serif;margin-top:2px;white-space:nowrap}
+
+/* 사이클 */
+.ttl{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:14px}
+.ttl h2{margin:0;font-size:15px;font-weight:700}
+.ttl span{font-size:12px;color:var(--mute)}
+.track{position:relative;height:8px;border-radius:99px;background:linear-gradient(90deg,#3b2f06,var(--y2) 60%,var(--y));margin:34px 6px 10px}
+.mark{position:absolute;top:50%;width:18px;height:18px;border-radius:50%;background:var(--y);border:3px solid var(--p1);transform:translate(-50%,-50%);box-shadow:0 0 0 1px var(--y),0 0 16px #fcd53588;transition:left .6s cubic-bezier(.2,.8,.2,1)}
+.tip{position:absolute;bottom:18px;transform:translateX(-50%);font:600 12px "IBM Plex Sans",Pretendard,system-ui,sans-serif;background:var(--y);color:#181a20;padding:2px 7px;border-radius:4px;white-space:nowrap;transition:left .6s cubic-bezier(.2,.8,.2,1)}
+.ends{display:flex;justify-content:space-between;font-size:11.5px;color:var(--mute)}
+.ends b{display:block;color:var(--ink);font:600 13px "IBM Plex Sans",Pretendard,system-ui,sans-serif}
+.ends div:last-child{text-align:right}
+.stats{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px;margin-top:16px}
+.st{background:var(--p2);border-radius:10px;padding:12px}
+.st .k{font-size:12px;color:var(--mute);display:flex;align-items:center;gap:6px}
+.st .k i{width:8px;height:8px;border-radius:2px;display:inline-block}
+.st .p{font:600 20px "IBM Plex Sans",Pretendard,system-ui,sans-serif;margin-top:4px;white-space:nowrap}
+.st .d{font-size:12px;color:var(--mute);word-break:keep-all}
+.st .big{font:600 22px "IBM Plex Sans",Pretendard,system-ui,sans-serif;margin-top:10px;padding-top:10px;border-top:1px solid var(--p3)}
+.st .big small{display:block;font:400 12px Pretendard;color:var(--mute)}
+.foot{font-size:11.5px;color:var(--mute);text-align:center;line-height:1.8;margin-top:6px}
+@media(max-width:400px){.head{grid-template-columns:1fr}.s24{grid-template-columns:1fr 1fr;column-gap:14px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <span class="c3" id="coin" title="탭하면 기울기 3D 켜기"><span class="e" style="transform:translateZ(-2.5px)"></span><span class="e" style="transform:translateZ(-1.5px)"></span><span class="e" style="transform:translateZ(-.5px)"></span><span class="e" style="transform:translateZ(.5px)"></span><span class="e" style="transform:translateZ(1.5px)"></span><span class="e" style="transform:translateZ(2.5px)"></span><span class="f f2">₿</span><span class="f f1">₿</span></span>
+    <div class="pair">BTC/USDT<small>현물</small></div>
+    <div class="live" id="live"><i></i><span id="clock">연결 중</span></div>
+  </div>
+
+  <section class="pn">
+    <div class="head">
+      <div class="lift">
+        <div class="price n" id="bn">–</div>
+        <div class="fiat n" id="fiat">&nbsp;</div>
+        <span class="chgp n" id="bnc">–</span>
+      </div>
+      <div class="s24">
+        <div><span>24h 고가</span><span class="n" id="hi">–</span></div>
+        <div><span>24h 저가</span><span class="n" id="lo">–</span></div>
+        <div><span>24h 거래대금</span><span class="n" id="vol">–</span></div>
+        <div><span>ATH 대비</span><span class="n r" id="dd0">–</span></div>
+      </div>
+    </div>
+    <div class="tabs" role="tablist">
+      <button class="tab" data-tf="d" role="tab">1일봉 · 90일</button>
+      <button class="tab on" data-tf="w" role="tab">1주봉 · ATH 이후</button>
+      <span class="leg"><span class="y">┅</span> ATH</span>
+    </div>
+    <div class="fig"><svg id="chart" aria-label="BTC 캔들 차트"></svg></div>
+  </section>
+
+  <div class="duo">
+    <div class="pn"><div class="lb"><span class="ex">U</span>업비트 BTC/KRW</div><div class="v n lift" id="ub">–</div><div class="sub n" id="ubc">&nbsp;</div></div>
+    <div class="pn"><div class="lb">김치프리미엄</div><div class="v n y lift" id="kp">–</div><div class="sub n m" id="usdt">&nbsp;</div></div>
+  </div>
+
+  <section class="pn">
+    <div class="ttl"><h2>사이클 위치</h2><span id="days0"></span></div>
+    <div class="track lift"><span class="tip" id="tip">–</span><span class="mark" id="mark"></span></div>
+    <div class="ends"><div>ATH 이후 저점<b id="eLow">–</b></div><div>ATH<b id="eAth">–</b></div></div>
+    <div class="stats">
+      <div class="st"><div class="k"><i style="background:var(--y)"></i>ATH</div><div class="p n" id="athP">–</div><div class="d" id="athD"></div>
+        <div class="big n r" id="dd">–<small id="days"></small></div></div>
+      <div class="st"><div class="k"><i style="background:var(--b)"></i>ATH 이후 저점</div><div class="p n" id="lowP">–</div><div class="d" id="lowDt"></div>
+        <div class="big n g" id="fl">–<small id="lowD"></small></div></div>
+    </div>
+  </section>
+
+  <div class="foot"><span id="sync">고점·저점 자동 확인 중…</span><br><span id="sens">3D: 확인 중</span></div>
+</div>
+<script>
+{
+const $=id=>document.getElementById(id);
+const pad=n=>String(n).padStart(2,'0');
+const now=()=>{const d=new Date();return pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds())};
+const sign=v=>(v>=0?'+':'')+v.toFixed(2)+'%';
+const usd=v=>'$'+Math.round(v).toLocaleString('en-US');
+const f2=v=>v.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+let ub=0,bn=0,usdt=0,lastBn=0;
+const live={u:false,b:false};
+function setLive(){const on=live.u||live.b;$('live').classList.toggle('on',on);$('clock').textContent=on?now():'연결 중'}
+
+/* ---- ATH / ATH 이후 저점 ---- */
+const KEY='btc-athlow-v1';
+const BASE={ath:126273,athDate:'2025-10-06',low:55130,lowDate:'2026-11-21'};
+let S={...BASE},K=[],tf='w';
+try{const s=JSON.parse(localStorage.getItem(KEY)||'null');if(s&&s.ath>=BASE.ath)S=s}catch(e){}
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
+const todayKST=()=>new Date(Date.now()+9*3600000).toISOString().slice(0,10);
+const dayN=s=>Date.UTC(+s.slice(0,4),+s.slice(5,7)-1,+s.slice(8,10))/86400000;
+const fmtD=s=>s.slice(0,4)+'.'+(+s.slice(5,7))+'.'+(+s.slice(8,10));
+function newPrice(p,d){
+  if(p>S.ath){S.ath=p;S.athDate=d;S.low=null;S.lowDate=null;return true}
+  if(d>S.athDate&&(S.low==null||p<S.low)){S.low=p;S.lowDate=d;return true}
+  return false}
+
+function kimp(){if(ub&&bn&&usdt){const k=(ub/(bn*usdt)-1)*100;$('kp').textContent=sign(k);$('usdt').textContent='USDT ₩'+usdt.toLocaleString('ko-KR');
+  $('fiat').textContent='≈ ₩'+Math.round(bn*usdt).toLocaleString('ko-KR')}}
+function setUb(code,price,rate){
+  if(code==='KRW-BTC'){ub=price;$('ub').textContent='₩'+Math.round(price).toLocaleString('ko-KR');const p=rate*100;$('ubc').textContent=sign(p)+' 24h';$('ubc').className='sub n '+(p>=0?'g':'r')}
+  if(code==='KRW-USDT')usdt=price;kimp()}
+function setBn(x){
+  const price=+x.c;bn=price;const el=$('bn');el.textContent=f2(price);
+  el.className='price n '+(lastBn&&price<lastBn?'r':'g');lastBn=price;
+  const p=+x.P,c=$('bnc');c.textContent=sign(p);c.className='chgp n '+(p>=0?'g':'r');
+  if(x.h)$('hi').textContent=f2(+x.h);if(x.l)$('lo').textContent=f2(+x.l);
+  if(x.q){const q=+x.q;$('vol').textContent=(q>=1e9?(q/1e9).toFixed(2)+'B':(q/1e6).toFixed(1)+'M')}
+  kimp();if(newPrice(price,todayKST()))save();drawAth();
+  if(K.length){const l=K[K.length-1];l[4]=price;if(price>l[2])l[2]=price;if(price<l[3])l[3]=price;drawChart()}}
+
+function drawAth(){
+  const t=dayN(todayKST()),dA=t-dayN(S.athDate);
+  $('athP').textContent=usd(S.ath);$('athD').textContent=fmtD(S.athDate);$('eAth').textContent=usd(S.ath);
+  $('days').textContent='ATH 이후 '+dA.toLocaleString('ko-KR')+'일 지남';$('days0').textContent='ATH 후 '+dA+'일';
+  if(S.low!=null){$('lowP').textContent=usd(S.low);$('lowDt').textContent=fmtD(S.lowDate)+' · ATH 이후 '+(dayN(S.lowDate)-dayN(S.athDate))+'일째';
+    $('eLow').textContent=usd(S.low);$('lowD').textContent='저점 이후 '+(t-dayN(S.lowDate))+'일 지남'}
+  else{$('lowP').textContent='–';$('lowDt').textContent='새 ATH 이후 기록 대기';$('eLow').textContent='–'}
+  if(!bn)return;
+  const dd=sign((bn/S.ath-1)*100);$('dd').firstChild.textContent=dd;$('dd0').textContent=dd;
+  if(S.low!=null){$('fl').firstChild.textContent=sign((bn/S.low-1)*100);
+    const pos=Math.max(0,Math.min(1,(bn-S.low)/(S.ath-S.low)))*100;
+    $('mark').style.left=pos+'%';$('tip').style.left=Math.max(9,Math.min(91,pos))+'%';$('tip').textContent=usd(bn)}}
+
+/* ---- 캔들 차트 ---- */
+const svg=$('chart');
+function candles(){
+  const since=K.filter(k=>new Date(k[0]).toISOString().slice(0,10)>=S.athDate);
+  if(tf==='d')return K.slice(-90);
+  const out=[];for(let i=0;i<since.length;i+=7){const g=since.slice(i,i+7);
+    out.push([g[0][0],g[0][1],Math.max(...g.map(k=>k[2])),Math.min(...g.map(k=>k[3])),g[g.length-1][4]])}
+  return out}
+function drawChart(){
+  const W=svg.clientWidth,H=svg.clientHeight,cs=K.length?candles():[];
+  if(!W||cs.length<2){svg.innerHTML='<text x="50%" y="50%" text-anchor="middle" fill="#848e9c" font-size="13">차트 불러오는 중…</text>';return}
+  const R=58,cw=W-R,top=14,bot=H-18;
+  let lo=Math.min(...cs.map(k=>k[3])),hi=Math.max(...cs.map(k=>k[2]));
+  if(tf==='w'){hi=Math.max(hi,S.ath);if(S.low)lo=Math.min(lo,S.low)}
+  const pd=(hi-lo)*.06;lo-=pd;hi+=pd;
+  const y=v=>top+(hi-v)/(hi-lo)*(bot-top),step=cw/cs.length,bw=Math.max(1,Math.min(9,step*.62));
+  let g='';
+  const tags=[y(S.ath),y(cs[cs.length-1][4])];
+  for(let i=0;i<=4;i++){const v=lo+(hi-lo)*i/4,yy=y(v),hide=tags.some(t=>Math.abs(t-yy)<16);
+    g+='<line x1="0" x2="'+cw+'" y1="'+yy+'" y2="'+yy+'" stroke="#2b3139" stroke-width="1"/>'+
+       (hide?'':'<text x="'+(W-4)+'" y="'+(yy+4)+'" text-anchor="end" fill="#848e9c" font-size="10.5" font-family="IBM Plex Sans,Pretendard,sans-serif">'+Math.round(v).toLocaleString('en-US')+'</text>')}
+  let c='';cs.forEach((k,i)=>{const x=step*i+step/2,up=k[4]>=k[1],col=up?'#0ecb81':'#f6465d';
+    const yo=y(k[1]),yc=y(k[4]);
+    c+='<line x1="'+x+'" x2="'+x+'" y1="'+y(k[2])+'" y2="'+y(k[3])+'" stroke="'+col+'" stroke-width="1"/>'+
+       '<rect x="'+(x-bw/2)+'" y="'+Math.min(yo,yc)+'" width="'+bw+'" height="'+Math.max(1,Math.abs(yc-yo))+'" fill="'+col+'"/>'});
+  let a='';
+  if(S.ath<=hi){const ya=y(S.ath);a+='<line x1="0" x2="'+cw+'" y1="'+ya+'" y2="'+ya+'" stroke="#fcd535" stroke-dasharray="4 4"/>'+
+    '<rect x="'+cw+'" y="'+(ya-9)+'" width="'+R+'" height="18" rx="2" fill="#fcd535"/><text x="'+(W-4)+'" y="'+(ya+4)+'" text-anchor="end" fill="#181a20" font-size="10.5" font-weight="700" font-family="IBM Plex Sans,Pretendard,sans-serif">ATH</text>'}
+  const last=cs[cs.length-1][4],yl=y(last),lc=last>=cs[cs.length-1][1]?'#0ecb81':'#f6465d';
+  a+='<line x1="0" x2="'+cw+'" y1="'+yl+'" y2="'+yl+'" stroke="'+lc+'" stroke-dasharray="1 3"/>'+
+     '<rect x="'+cw+'" y="'+(yl-9)+'" width="'+R+'" height="18" rx="2" fill="'+lc+'"/><text x="'+(W-4)+'" y="'+(yl+4)+'" text-anchor="end" fill="#fff" font-size="10.5" font-weight="600" font-family="IBM Plex Sans,Pretendard,sans-serif">'+Math.round(last).toLocaleString('en-US')+'</text>';
+  const d0=new Date(cs[0][0]),d1=new Date(cs[cs.length-1][0]);
+  a+='<text x="2" y="'+(H-3)+'" fill="#848e9c" font-size="10.5">'+(d0.getUTCFullYear()%100)+'.'+(d0.getUTCMonth()+1)+'.'+d0.getUTCDate()+'</text>'+
+     '<text x="'+cw+'" y="'+(H-3)+'" text-anchor="end" fill="#848e9c" font-size="10.5">'+(d1.getUTCFullYear()%100)+'.'+(d1.getUTCMonth()+1)+'.'+d1.getUTCDate()+'</text>';
+  svg.innerHTML=g+c+a}
+const ro=new ResizeObserver(drawChart);ro.observe(svg);
+for(const b of document.querySelectorAll('.tab'))b.addEventListener('click',()=>{tf=b.dataset.tf;
+  for(const x of document.querySelectorAll('.tab'))x.classList.toggle('on',x===b);drawChart()});
+
+async function syncKlines(){
+  const start=Date.UTC(2025,9,6);let ks=null;
+  for(const h of['https://api.binance.com','https://data-api.binance.vision']){
+    try{const r=await fetch(h+'/api/v3/klines?symbol=BTCUSDT&interval=1d&limit=1000&startTime='+start);if(r.ok){ks=await r.json();break}}catch(e){}}
+  if(!ks){$('sync').textContent='일봉 확인 실패 · 실시간 가격으로만 고점·저점 갱신';return}
+  let ch=false;
+  for(const k of ks){const d=new Date(k[0]).toISOString().slice(0,10),hi=+k[2],lo=+k[3];
+    if(d<S.athDate)continue;
+    if(hi>S.ath){S.ath=hi;S.athDate=d;S.low=null;S.lowDate=null;ch=true;continue}
+    if(d>S.athDate&&(S.low==null||lo<S.low)){S.low=lo;S.lowDate=d;ch=true}}
+  if(ch)save();
+  K=ks.map(k=>[k[0],+k[1],+k[2],+k[3],+k[4]]);
+  drawAth();drawChart();
+  $('sync').textContent='고점·저점 자동 갱신 · 바이낸스 기준 · '+now()}
+
+/* ---- 업비트 ---- */
+function upbit(){
+  let ws;try{ws=new WebSocket('wss://api.upbit.com/websocket/v1')}catch(e){upbitRest();return}
+  ws.binaryType='arraybuffer';
+  ws.onopen=()=>{live.u=true;setLive();ws.send(JSON.stringify([{ticket:'btc-'+Date.now()},{type:'ticker',codes:['KRW-BTC','KRW-USDT']}]))};
+  ws.onmessage=e=>{try{const x=JSON.parse(typeof e.data==='string'?e.data:new TextDecoder().decode(e.data));setUb(x.code,x.trade_price,x.signed_change_rate);setLive()}catch(er){}};
+  ws.onclose=()=>{live.u=false;setLive();setTimeout(upbit,3000)};
+  ws.onerror=()=>upbitRest()}
+async function upbitRest(){try{const r=await fetch('https://api.upbit.com/v1/ticker?markets=KRW-BTC,KRW-USDT');for(const x of await r.json())setUb(x.market,x.trade_price,x.signed_change_rate)}catch(e){if(!ub)$('ub').textContent='연결 실패'}}
+
+/* ---- 바이낸스 ---- */
+const bnUrls=['wss://stream.binance.com:9443/ws/btcusdt@ticker','wss://data-stream.binance.vision/ws/btcusdt@ticker'];
+let bi=0,bnGot=false;
+function binance(){
+  let ws;try{ws=new WebSocket(bnUrls[bi%bnUrls.length])}catch(e){binanceRest();return}
+  ws.onopen=()=>{live.b=true;setLive()};
+  ws.onmessage=e=>{try{bnGot=true;setBn(JSON.parse(e.data));setLive()}catch(er){}};
+  ws.onclose=()=>{live.b=false;setLive();if(!bnGot)bi++;setTimeout(binance,3000)};
+  ws.onerror=()=>binanceRest()}
+async function binanceRest(){for(const u of['https://api.binance.com/api/v3/ticker/24hr?symbol=BTCUSDT','https://data-api.binance.vision/api/v3/ticker/24hr?symbol=BTCUSDT']){
+  try{const r=await fetch(u);const x=await r.json();setBn({c:x.lastPrice,P:x.priceChangePercent,h:x.highPrice,l:x.lowPrice,q:x.quoteVolume});return}catch(e){}}
+  if(!bn)$('bn').textContent='연결 실패'}
+
+/* ---- 3D: 센서 → 기울기, 없으면 자동 3D + 터치 ---- */
+const tilts=[...document.querySelectorAll('.pn')];
+const cl=(v,m)=>Math.max(-m,Math.min(m,v));
+function tilt(el,rx,ry,gx,gy,go){el.style.transform='rotateX('+rx.toFixed(2)+'deg) rotateY('+ry.toFixed(2)+'deg)';el.style.setProperty('--gx',gx+'%');el.style.setProperty('--gy',gy+'%');el.style.setProperty('--go',go)}
+let ob=null,og=null,raf=0,sway=0,sensorOn=false,touchEl=null;
+for(const el of tilts){
+  el.addEventListener('pointermove',e=>{if(e.pointerType==='touch')return;const r=el.getBoundingClientRect(),px=(e.clientX-r.left)/r.width,py=(e.clientY-r.top)/r.height;tilt(el,(.5-py)*8,(px-.5)*10,px*100,py*100,1)});
+  el.addEventListener('pointerleave',()=>tilt(el,0,0,50,0,.6));
+  el.addEventListener('touchstart',e=>{const p=e.touches[0],r=el.getBoundingClientRect(),px=(p.clientX-r.left)/r.width,py=(p.clientY-r.top)/r.height;
+    touchEl=el;tilt(el,(py-.5)*-12,(px-.5)*14,px*100,py*100,1);el.style.transform+=' scale(.985)'},{passive:true});
+  el.addEventListener('touchend',()=>{touchEl=null},{passive:true});
+  el.addEventListener('touchcancel',()=>{touchEl=null},{passive:true});
+}
+function onOri(e){if(e.beta==null)return;if(ob==null){ob=e.beta;og=e.gamma;sensorOn=true;cancelAnimationFrame(sway);$('sens').textContent='3D: 기울기 센서 작동 중'}
+  const rx=cl(-(e.beta-ob)*.35,8),ry=cl((e.gamma-og)*.45,8);
+  cancelAnimationFrame(raf);raf=requestAnimationFrame(()=>{for(const el of tilts)tilt(el,rx,ry,50+ry*5,30-rx*5,1)})}
+function swayLoop(t){if(sensorOn)return;const rx=Math.sin(t/1800)*3,ry=Math.cos(t/2400)*4.5;
+  for(const el of tilts)if(el!==touchEl)tilt(el,rx,ry,50+ry*7,20-rx*7,.9);sway=requestAnimationFrame(swayLoop)}
+const DOE=window.DeviceOrientationEvent;
+if(DOE&&typeof DOE.requestPermission==='function')$('coin').addEventListener('click',async()=>{try{if(await DOE.requestPermission()==='granted')addEventListener('deviceorientation',onOri)}catch(e){}});
+else if(DOE)addEventListener('deviceorientation',onOri);
+setTimeout(()=>{if(!sensorOn){$('sens').textContent='3D: 자동 모드 (https 링크로 열면 폰 기울기에 반응)';sway=requestAnimationFrame(swayLoop)}},2500);
+
+drawAth();drawChart();setInterval(drawAth,60000);
+syncKlines();setInterval(syncKlines,600000);
+upbit();binance();
+}
+</script>
+</body>
+</html>
