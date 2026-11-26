@@ -100,11 +100,6 @@ body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 Pretendard,sys
         <span class="chgp n" id="bnc">–</span>
       </div>
     </div>
-    <div class="tabs" role="tablist">
-      <button class="tab on" data-tf="w" role="tab">1주봉 · ATH 이후</button>
-      <span class="leg"><span class="y">┅</span> ATH</span>
-    </div>
-    <div class="fig"><svg id="chart" aria-label="BTC 캔들 차트"></svg></div>
   </section>
 
   <div class="duo">
@@ -185,7 +180,7 @@ function candles(){
   const out=[];for(let i=0;i<since.length;i+=7){const g=since.slice(i,i+7);
     out.push([g[0][0],g[0][1],Math.max(...g.map(k=>k[2])),Math.min(...g.map(k=>k[3])),g[g.length-1][4]])}
   return out}
-function drawChart(){
+function drawChart(){if(!svg)return;
   const W=svg.clientWidth,H=svg.clientHeight,cs=K.length?candles():[];
   if(!W||cs.length<2){svg.innerHTML='<text x="50%" y="50%" text-anchor="middle" fill="#848e9c" font-size="13">차트 불러오는 중…</text>';return}
   const R=58,cw=W-R,top=14,bot=H-18;
@@ -212,7 +207,7 @@ function drawChart(){
   a+='<text x="2" y="'+(H-3)+'" fill="#848e9c" font-size="10.5">'+(d0.getUTCFullYear()%100)+'.'+(d0.getUTCMonth()+1)+'.'+d0.getUTCDate()+'</text>'+
      '<text x="'+cw+'" y="'+(H-3)+'" text-anchor="end" fill="#848e9c" font-size="10.5">'+(d1.getUTCFullYear()%100)+'.'+(d1.getUTCMonth()+1)+'.'+d1.getUTCDate()+'</text>';
   svg.innerHTML=g+c+a}
-const ro=new ResizeObserver(drawChart);ro.observe(svg);
+if(svg){const ro=new ResizeObserver(drawChart);ro.observe(svg)}
 for(const b of document.querySelectorAll('.tab'))b.addEventListener('click',()=>{tf=b.dataset.tf;
   for(const x of document.querySelectorAll('.tab'))x.classList.toggle('on',x===b);drawChart()});
 
