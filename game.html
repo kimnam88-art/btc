@@ -377,12 +377,13 @@ function log(name,text,sys){const d=document.createElement('div');if(sys){d.clas
 const ROOM=((location.hash.slice(1)||'main').replace(/[^a-z0-9-]/gi,'')||'main').slice(0,24);
 const TOPIC='btcstreet-kn88/v1/'+ROOM;
 const myId=Math.random().toString(36).slice(2,10);
-let myName='',myTag=null,client=null,online=false;
+let myName='',myTag=null,online=false;
 const others=new Map();
 const suits=['#5a5f6a','#3b2a4a','#2f4a3a','#4a2f2f','#2a3f5a','#6a5a3a'];
 function suitOf(id){let h=0;for(const ch of id)h=(h*31+ch.charCodeAt(0))>>>0;return suits[h%suits.length]}
 function setNet(){const n=others.size+1;$('net').classList.toggle('on',online);$('netT').textContent=online?'접속 '+n+'명':'연결 중'}
-function pub(sub,obj){if(online)try{client.publish(TOPIC+'/'+sub,JSON.stringify(obj),{qos:0})}catch(e){}}
+setInterval(()=>{if(myTag)$('net').title=netLabel()},2000);
+function pub(sub,obj){const m=JSON.stringify(obj);for(const cn of conns)if(cn.ok)try{cn.c.publish(TOPIC+'/'+sub,m,{qos:0})}catch(e){}}
 let lastSent={x:0,z:0,r:0,t:0};
 function sendPos(force){const t=performance.now(),p=P.position;
   if(force||t-lastSent.t>2000||(t-lastSent.t>110&&(Math.abs(p.x-lastSent.x)+Math.abs(p.z-lastSent.z)>.03||Math.abs(P.rotation.y-lastSent.r)>.05||p.y>0))){
@@ -395,18 +396,26 @@ function onMsg(topic,buf){let m;try{m=JSON.parse(String(buf))}catch(e){return}if
   const kind=topic.slice(TOPIC.length+1),name=typeof m.n==='string'?m.n.slice(0,10):'';
   if(kind==='pos'){const o=other(m.id,name);o.tx=+m.x||0;o.ty=+m.y||0;o.tz=+m.z||0;o.tr=+m.r||0;if(!o.init){o.init=true;o.a.P.position.set(o.tx,o.ty,o.tz)}}
   else if(kind==='hello'){const fresh=!others.has(m.id);other(m.id,name);if(fresh)log('',(name||'친구')+'님이 들어왔어요',true);sendPos(true)}
-  else if(kind==='chat'&&typeof m.t==='string'){const o=other(m.id,name);const txt=m.t.slice(0,80);say(o.tag,txt);log(o.name,txt)}
+  else if(kind==='chat'&&typeof m.t==='string'){if(m.mid){if(seenMsg.has(m.mid))return;seenMsg.add(m.mid)}const o=other(m.id,name);const txt=m.t.slice(0,80);say(o.tag,txt);log(o.name,txt)}
   else if(kind==='bye'){const o=others.get(m.id);if(o)log('',o.name+'님이 나갔어요',true);drop(m.id)}}
-const brokers=['wss://broker.hivemq.com:8884/mqtt','wss://broker.emqx.io:8084/mqtt'];let bk=0,closing=false;
+const brokers=[['HiveMQ','wss://broker.hivemq.com:8884/mqtt'],['EMQX','wss://broker.emqx.io:8084/mqtt']];
+const conns=brokers.map(([name,url])=>({name,url,c:null,ok:false,n:0}));
+const seenMsg=new Set();
+function netLabel(){const on=conns.filter(x=>x.ok).map(x=>x.name);return on.length?on.join('+'):'연결 안 됨'}
+function connectOne(cn){
+  cn.n++;let closed=false;
+  try{cn.c=mqtt.connect(cn.url,{clientId:'bs_'+myId+'_'+cn.name+cn.n,clean:true,connectTimeout:10000,reconnectPeriod:0,keepalive:30,
+    will:{topic:TOPIC+'/bye',payload:JSON.stringify({id:myId}),qos:0,retain:false}})}catch(e){setTimeout(()=>connectOne(cn),5000);return}
+  cn.c.on('connect',()=>{cn.ok=true;online=true;setNet();cn.c.subscribe(TOPIC+'/#');
+    try{cn.c.publish(TOPIC+'/hello',JSON.stringify({id:myId,n:myName}),{qos:0})}catch(e){}sendPos(true)});
+  cn.c.on('message',onMsg);
+  cn.c.on('error',()=>{});
+  cn.c.on('close',()=>{if(closed)return;closed=true;cn.ok=false;online=conns.some(x=>x.ok);setNet();try{cn.c.end(true)}catch(e){}setTimeout(()=>connectOne(cn),4000)});
+}
 function connect(){
   if(!window.mqtt){$('netT').textContent='채팅 불가';log('','채팅 모듈을 불러오지 못했어요. 새로고침해 주세요.',true);return}
-  closing=false;
-  try{client=mqtt.connect(brokers[bk%brokers.length],{clientId:'bs_'+myId+'_'+bk,clean:true,connectTimeout:8000,reconnectPeriod:0,keepalive:30,
-    will:{topic:TOPIC+'/bye',payload:JSON.stringify({id:myId}),qos:0,retain:false}})}catch(e){bk++;setTimeout(connect,3000);return}
-  client.on('connect',()=>{online=true;setNet();client.subscribe(TOPIC+'/#');pub('hello',{id:myId,n:myName});sendPos(true)});
-  client.on('message',onMsg);
-  client.on('error',()=>{});
-  client.on('close',()=>{if(closing)return;closing=true;online=false;setNet();try{client.end(true)}catch(e){}bk++;setTimeout(connect,3000)});
+  conns.forEach(connectOne);
+  setTimeout(()=>{if(!online)log('','채팅 서버 연결이 안 돼요. 와이파이↔데이터를 바꿔 보세요.',true)},15000);
 }
 addEventListener('pagehide',()=>{pub('bye',{id:myId})});
 
@@ -418,7 +427,7 @@ $('chatBtn').addEventListener('click',openChat);
 $('boardBtn').addEventListener('click',()=>{$('big').classList.add('on');$('bigC').getContext('2d').drawImage(BC,0,0)});
 $('bigX').addEventListener('click',()=>$('big').classList.remove('on'));$('barX').addEventListener('click',closeChat);
 bar.addEventListener('submit',e=>{e.preventDefault();const t=msg.value.trim().slice(0,80);if(!t){closeChat();return}
-  msg.value='';say(myTag,t);log(myName,t);if(online)pub('chat',{id:myId,n:myName,t});else log('','아직 채팅 서버에 연결 중이에요',true);closeChat()});
+  msg.value='';say(myTag,t);log(myName,t);if(online)pub('chat',{id:myId,n:myName,t,mid:myId+Date.now()});else log('','아직 채팅 서버에 연결 중이에요',true);closeChat()});
 
 /* ================= 조작 ================= */
 const keys={};
