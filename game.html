@@ -105,10 +105,10 @@ const krw=v=>'₩'+Math.round(v).toLocaleString('ko-KR');
 function newPrice(p,d){if(p>S.ath){S.ath=p;S.athDate=d;S.low=null;S.lowDate=null;return true}
   if(d>S.athDate&&(S.low==null||p<S.low)){S.low=p;S.lowDate=d;return true}return false}
 let dirty=true;
-function onBn(c,P){D.bn=c;D.bnP=P;$('hp').textContent=usd(c);if(newPrice(c,todayKST()))save();dirty=true}
+function onBn(c,P){D.bn=c;D.bnP=P;if(typeof live15==='function')live15(c);$('hp').textContent=usd(c);if(newPrice(c,todayKST()))save();dirty=true}
 function upbit(){let ws;try{ws=new WebSocket('wss://api.upbit.com/websocket/v1')}catch(e){return}
   ws.binaryType='arraybuffer';
-  ws.onopen=()=>ws.send(JSON.stringify([{ticket:'v-'+Date.now()},{type:'ticker',codes:['KRW-BTC','KRW-USDT','KRW-ETH','KRW-XRP','KRW-SOL','KRW-DOGE','KRW-ADA','KRW-TRX','KRW-LINK','KRW-AVAX','KRW-BCH','KRW-DOT']}]));
+  ws.onopen=()=>ws.send(JSON.stringify([{ticket:'v-'+Date.now()},{type:'ticker',codes:['KRW-BTC','KRW-USDT']}]));
   ws.onmessage=e=>{try{const x=JSON.parse(typeof e.data==='string'?e.data:new TextDecoder().decode(e.data));
     if(x.code==='KRW-BTC'){D.ub=x.trade_price;D.ubP=x.signed_change_rate*100}if(x.code==='KRW-USDT'){D.usdt=x.trade_price;D.usdtP=x.signed_change_rate*100}else if(x.code!=='KRW-BTC')D.coins[x.code]={p:x.trade_price,r:x.signed_change_rate*100};dirty=true}catch(er){}};
   ws.onclose=()=>setTimeout(upbit,3000)}
@@ -192,48 +192,90 @@ rects.push({x0:-13,x1:13,z0:-21.5,z1:-13.9});
 /* 시세판 캔버스 */
 const BC=document.createElement('canvas');BC.width=2048;BC.height=1024;
 const bigT=new THREE.CanvasTexture(BC);bigT.colorSpace=THREE.SRGBColorSpace;bigT.anisotropy=8;
-box(23.4,11.4,.5,'#15171b',0,7,-14.15);
+box(23.4,11.4,.5,'#2b3139',0,7,-14.15);
 const scr=new THREE.Mesh(BOX,[dark2(),dark2(),dark2(),dark2(),new THREE.MeshBasicMaterial({map:bigT}),dark2()]);scr.scale.set(22.4,11.2,.2);scr.position.set(0,7,-13.85);scene.add(scr);
 function dark2(){return M('#111')}
-const COINS=[['KRW-ETH','이더리움'],['KRW-XRP','리플'],['KRW-SOL','솔라나'],['KRW-DOGE','도지코인'],['KRW-ADA','에이다'],['KRW-TRX','트론'],['KRW-LINK','체인링크'],['KRW-AVAX','아발란체'],['KRW-BCH','비트코인캐시'],['KRW-DOT','폴카닷']];
-const UP='#ff4636',DN='#3aa0ff',NUM='#46ff6e',LAB='#f2f2f2',YEL='#ffd23a';
-const arrow=v=>v==null?'':(v>=0?'▲':'▼')+Math.abs(v).toFixed(2)+'%';
-const kfmt=v=>v>=100?Math.round(v).toLocaleString('ko-KR'):v>=1?v.toFixed(2):v.toFixed(4);
+const UP='#0ecb81',DN='#f6465d',Y='#fcd535',INK='#eaecef',MU='#848e9c',P1='#181a20',P2='#1e2329';
+let K15=[];
+async function sync15(){for(const h of['https://api.binance.com','https://data-api.binance.vision']){
+  try{const r=await fetch(h+'/api/v3/klines?symbol=BTCUSDT&interval=15m&limit=96');if(!r.ok)continue;
+    K15=(await r.json()).map(k=>[k[0],+k[1],+k[2],+k[3],+k[4]]);dirty=true;return}catch(e){}}}
+sync15();setInterval(sync15,60000);
+function live15(c){if(!K15.length)return;let l=K15[K15.length-1];
+  if(Date.now()>=l[0]+900000){l=[l[0]+900000,l[4],c,c,c];K15.push(l);if(K15.length>96)K15.shift()}
+  l[4]=c;if(c>l[2])l[2]=c;if(c<l[3])l[3]=c}
+function rr(g,x,y,w,h,r,c){g.fillStyle=c;g.beginPath();g.moveTo(x+r,y);g.arcTo(x+w,y,x+w,y+h,r);g.arcTo(x+w,y+h,x,y+h,r);g.arcTo(x,y+h,x,y,r);g.arcTo(x,y,x+w,y,r);g.closePath();g.fill()}
+function tx(g,s,x,y,font,c,al){g.font=font+' Pretendard, system-ui, sans-serif';g.fillStyle=c;g.textAlign=al||'left';g.fillText(s,x,y)}
+const p2=n=>String(n).padStart(2,'0');
 function drawBig(){
-  const g=BC.getContext('2d'),W=2048,Hh=1024,t=dayN(todayKST());
-  g.fillStyle='#030503';g.fillRect(0,0,W,Hh);
-  g.fillStyle='#0d1f0d';g.fillRect(0,0,W,100);
-  g.textBaseline='middle';g.font='800 50px Pretendard, sans-serif';
-  g.textAlign='left';g.fillStyle=YEL;g.fillText('BTC 핵심 지표',40,52);g.fillText('업비트 원화 시세',1064,52);
-  const n=new Date();g.textAlign='right';g.fillStyle=NUM;g.fillText(String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0')+':'+String(n.getSeconds()).padStart(2,'0'),W-40,52);
-  g.fillStyle='#1d3a1d';g.fillRect(1022,0,4,Hh);
+  const g=BC.getContext('2d'),W=2048,H=1024,t=dayN(todayKST());
+  g.fillStyle='#0b0e11';g.fillRect(0,0,W,H);g.textBaseline='middle';
+  /* 상단 바 */
+  g.fillStyle=Y;g.beginPath();g.arc(64,52,26,0,7);g.fill();tx(g,'₿',64,54,'900 32px','#1a1400','center');
+  tx(g,'BTC/USDT',106,52,'800 44px',INK);g.font='800 44px Pretendard, sans-serif';const pw=g.measureText('BTC/USDT').width;
+  rr(g,118+pw,32,84,40,8,'#2b3139');tx(g,'현물',160+pw,53,'600 26px',MU,'center');
+  const n=new Date();tx(g,p2(n.getHours())+':'+p2(n.getMinutes())+':'+p2(n.getSeconds()),W-40,52,'600 30px',MU,'right');
+  g.fillStyle=UP;g.beginPath();g.arc(W-180,52,7,0,7);g.fill();
+  /* 왼쪽: 가격 + 15분봉 */
+  rr(g,30,96,1000,900,24,P1);
+  const pc=D.bnP>=0?UP:DN;
+  tx(g,D.bn?D.bn.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}):'연결 중',70,180,'800 104px',D.bn?pc:MU);
+  tx(g,D.bn&&D.usdt?'≈ ₩'+Math.round(D.bn*D.usdt).toLocaleString('ko-KR'):'',74,262,'500 34px',MU);
+  if(D.bn){rr(g,70,296,190,54,10,D.bnP>=0?'#0ecb8126':'#f6465d26');tx(g,sign(D.bnP),165,324,'700 32px',pc,'center')}
+  tx(g,'15분봉 · 최근 24시간',70,400,'700 30px',INK);g.fillStyle=Y;g.fillRect(70,424,300,5);
+  g.fillStyle='#2b3139';g.fillRect(60,428,940,2);
+  const cs=K15;
+  if(cs.length>1){
+    const X0=60,X1=890,Y0=462,Y1=930;
+    let lo=Math.min(...cs.map(k=>k[3])),hi=Math.max(...cs.map(k=>k[2]));const pd=(hi-lo)*.06||1;lo-=pd;hi+=pd;
+    const yy=v=>Y0+(hi-v)/(hi-lo)*(Y1-Y0),step=(X1-X0)/cs.length,bw=Math.max(2,Math.min(14,step*.62));
+    const last=cs[cs.length-1][4],yl=yy(last);
+    for(let i=0;i<=4;i++){const v=lo+(hi-lo)*i/4,y=yy(v);g.fillStyle='#2b3139';g.fillRect(X0,y,X1-X0,1.5);
+      if(Math.abs(y-yl)>26)tx(g,Math.round(v).toLocaleString('en-US'),1000,y,'500 24px',MU,'right')}
+    cs.forEach((k,i)=>{const x=X0+step*i+step/2,c=k[4]>=k[1]?UP:DN,yo=yy(k[1]),yc=yy(k[4]);
+      g.fillStyle=c;g.fillRect(x-1,yy(k[2]),2,Math.max(1,yy(k[3])-yy(k[2])));g.fillRect(x-bw/2,Math.min(yo,yc),bw,Math.max(2,Math.abs(yc-yo)))});
+    /* 24시간 최고·최저 표시 */
+    let hiI=0,loI=0;cs.forEach((k,i)=>{if(k[2]>cs[hiI][2])hiI=i;if(k[3]<cs[loI][3])loI=i});
+    const mx=i=>X0+step*i+step/2;
+    tx(g,'최고 '+Math.round(cs[hiI][2]).toLocaleString('en-US'),Math.min(mx(hiI),X1-150),yy(cs[hiI][2])-18,'600 22px',INK,mx(hiI)>X1-150?'right':'left');
+    tx(g,'최저 '+Math.round(cs[loI][3]).toLocaleString('en-US'),Math.min(mx(loI),X1-150),yy(cs[loI][3])+20,'600 22px',INK,mx(loI)>X1-150?'right':'left');
+    const lc=last>=cs[cs.length-1][1]?UP:DN;
+    g.setLineDash([3,7]);g.strokeStyle=lc;g.lineWidth=2;g.beginPath();g.moveTo(X0,yl);g.lineTo(X1,yl);g.stroke();g.setLineDash([]);
+    rr(g,X1+4,yl-20,116,40,4,lc);tx(g,Math.round(last).toLocaleString('en-US'),X1+62,yl+1,'700 23px','#fff','center');
+    const tm=ms=>{const d=new Date(ms);return p2(d.getHours())+':'+p2(d.getMinutes())};
+    tx(g,tm(cs[0][0]),X0,964,'500 24px',MU);tx(g,tm(cs[Math.floor(cs.length/2)][0]),(X0+X1)/2,964,'500 24px',MU,'center');tx(g,tm(cs[cs.length-1][0]),X1,964,'500 24px',MU,'right');
+  }else tx(g,'차트 불러오는 중…',530,700,'600 32px',MU,'center');
+  /* 오른쪽 위: 업비트 · 김프 */
   const k=D.ub&&D.bn&&D.usdt?(D.ub/(D.bn*D.usdt)-1)*100:null;
+  rr(g,1050,96,474,240,22,P1);rr(g,1544,96,474,240,22,P1);
+  rr(g,1086,132,34,34,6,'#093687');tx(g,'U',1103,150,'800 22px','#fff','center');tx(g,'업비트 BTC/KRW',1132,150,'600 28px',MU);
+  tx(g,D.ub?'₩'+Math.round(D.ub).toLocaleString('ko-KR'):'연결 중',1086,226,'800 58px',INK);
+  if(D.ub)tx(g,sign(D.ubP)+' 24h',1086,292,'600 28px',D.ubP>=0?UP:DN);
+  tx(g,'김치프리미엄',1580,150,'600 28px',MU);tx(g,k==null?'계산 중':sign(k),1580,226,'800 64px',Y);
+  if(D.usdt)tx(g,'USDT ₩'+D.usdt.toLocaleString('ko-KR'),1580,292,'600 28px',MU);
+  /* 저점 ↔ ATH 위치 */
+  rr(g,1050,356,968,290,22,P1);
+  tx(g,'저점 ↔ ATH 사이 현재 위치',1090,404,'700 34px',INK);tx(g,'ATH 후 '+(t-dayN(S.athDate))+'일',1978,404,'500 28px',MU,'right');
+  const BX0=1100,BX1=1968,BY=520;
+  const gr=g.createLinearGradient(BX0,0,BX1,0);gr.addColorStop(0,'#3b2f06');gr.addColorStop(.6,'#f0b90b');gr.addColorStop(1,Y);
+  g.fillStyle=gr;g.beginPath();g.roundRect?g.roundRect(BX0,BY-8,BX1-BX0,16,8):g.rect(BX0,BY-8,BX1-BX0,16);g.fill();
+  if(D.bn&&S.low){const pos=Math.max(0,Math.min(1,(D.bn-S.low)/(S.ath-S.low))),mx=BX0+(BX1-BX0)*pos;
+    g.fillStyle=Y;g.beginPath();g.arc(mx,BY,20,0,7);g.fill();g.fillStyle=P1;g.beginPath();g.arc(mx,BY,12,0,7);g.fill();g.fillStyle=Y;g.beginPath();g.arc(mx,BY,8,0,7);g.fill();
+    const tl='$'+Math.round(D.bn).toLocaleString('en-US');g.font='700 26px Pretendard, sans-serif';const tw=g.measureText(tl).width+28,tx0=Math.max(BX0,Math.min(BX1-tw,mx-tw/2));
+    rr(g,tx0,BY-74,tw,40,6,Y);tx(g,tl,tx0+tw/2,BY-53,'700 26px','#181a20','center')}
+  tx(g,'ATH 이후 저점',BX0,576,'500 24px',MU);tx(g,S.low?usd(S.low):'–',BX0,612,'700 30px',INK);
+  tx(g,'ATH',BX1,576,'500 24px',MU,'right');tx(g,usd(S.ath),BX1,612,'700 30px',INK,'right');
+  /* ATH · 저점 카드 */
+  rr(g,1050,666,474,330,22,P1);rr(g,1544,666,474,330,22,P1);
   const dd=D.bn?(D.bn/S.ath-1)*100:null,fl=D.bn&&S.low?(D.bn/S.low-1)*100:null;
-  const pos=D.bn&&S.low?(D.bn-S.low)/(S.ath-S.low)*100:null,need=D.bn?(S.ath/D.bn-1)*100:null;
-  const sd=s=>s?s.slice(2,4)+'.'+s.slice(5,7)+'.'+s.slice(8,10):'';
-  const L=[
-    ['바이낸스 BTC',D.bn?'$'+D.bn.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}):'----',NUM,arrow(D.bn?D.bnP:null),D.bnP>=0?UP:DN],
-    ['업비트 BTC',D.ub?'₩'+Math.round(D.ub).toLocaleString('ko-KR'):'----',NUM,arrow(D.ub?D.ubP:null),D.ubP>=0?UP:DN],
-    ['테더 USDT',D.usdt?'₩'+kfmt(D.usdt):'----',NUM,arrow(D.usdt?D.usdtP:null),D.usdtP>=0?UP:DN],
-    ['김치프리미엄',k==null?'----':(k>=0?'+':'')+k.toFixed(2)+'%',YEL,'',LAB],
-    ['역대 최고가 ATH','$'+Math.round(S.ath).toLocaleString('en-US'),NUM,sd(S.athDate),LAB],
-    ['ATH 대비',dd==null?'----':(dd>=0?'+':'')+dd.toFixed(2)+'%',dd!=null&&dd>=0?UP:DN,(t-dayN(S.athDate))+'일 경과',LAB],
-    ['ATH 후 최저점',S.low?'$'+Math.round(S.low).toLocaleString('en-US'):'----',NUM,sd(S.lowDate),LAB],
-    ['저점 대비',fl==null?'----':(fl>=0?'+':'')+fl.toFixed(2)+'%',fl!=null&&fl>=0?UP:DN,S.low?(t-dayN(S.lowDate))+'일 경과':'',LAB],
-    ['저점↔ATH 위치',pos==null?'----':pos.toFixed(1)+'%',YEL,'',LAB],
-    ['ATH 회복까지',need==null?'----':'+'+Math.max(0,need).toFixed(2)+'%',UP,'',LAB]];
-  const RH=91,Y0=100;
-  L.forEach((r,i)=>{const y=Y0+RH*i+RH/2;
-    g.fillStyle=i%2?'#060c06':'#081208';g.fillRect(0,Y0+RH*i,1022,RH);
-    g.textAlign='left';g.fillStyle=LAB;g.font='700 44px Pretendard, sans-serif';g.fillText(r[0],40,y);
-    g.textAlign='right';g.fillStyle=r[2];g.font='800 54px Pretendard, sans-serif';g.fillText(r[1],770,y);
-    g.fillStyle=r[4];g.font='700 40px Pretendard, sans-serif';g.fillText(r[3],1000,y)});
-  COINS.forEach(([code,name],i)=>{const y=Y0+RH*i+RH/2,c=D.coins[code];
-    g.fillStyle=i%2?'#060c06':'#081208';g.fillRect(1026,Y0+RH*i,W-1026,RH);
-    g.textAlign='left';g.fillStyle=LAB;g.font='700 44px Pretendard, sans-serif';g.fillText(name,1064,y);
-    g.textAlign='right';g.fillStyle=c?(c.r>=0?UP:DN):NUM;g.font='800 54px Pretendard, sans-serif';g.fillText(c?kfmt(c.p):'----',1740,y);
-    g.font='700 40px Pretendard, sans-serif';g.fillText(c?arrow(c.r):'',W-40,y)});
-  g.fillStyle='#000';for(let x=0;x<W;x+=6)g.fillRect(x,0,1.7,Hh);for(let y=0;y<Hh;y+=6)g.fillRect(0,y,W,1.7);
+  g.fillStyle=Y;g.fillRect(1086,704,18,18);tx(g,'ATH',1116,714,'600 28px',MU);
+  tx(g,usd(S.ath),1086,780,'800 52px',INK);tx(g,fmtD(S.athDate),1086,834,'500 26px',MU);
+  g.fillStyle='#2b3139';g.fillRect(1086,866,402,2);
+  tx(g,dd==null?'–':sign(dd),1086,920,'800 56px',dd!=null&&dd>=0?UP:DN);tx(g,'ATH 이후 '+(t-dayN(S.athDate))+'일 지남',1086,968,'500 24px',MU);
+  g.fillStyle='#3b82f6';g.fillRect(1580,704,18,18);tx(g,'ATH 이후 저점',1610,714,'600 28px',MU);
+  tx(g,S.low?usd(S.low):'–',1580,780,'800 52px',INK);tx(g,S.low?fmtD(S.lowDate)+' · ATH 후 '+(dayN(S.lowDate)-dayN(S.athDate))+'일째':'새 ATH 후 대기',1580,834,'500 24px',MU);
+  g.fillStyle='#2b3139';g.fillRect(1580,866,402,2);
+  tx(g,fl==null?'–':sign(fl),1580,920,'800 56px',fl!=null&&fl>=0?UP:DN);tx(g,S.low?'저점 이후 '+(t-dayN(S.lowDate))+'일 지남':'',1580,968,'500 24px',MU);
   bigT.needsUpdate=true;
   if($('big').classList.contains('on'))$('bigC').getContext('2d').drawImage(BC,0,0)}
 /* LED 전광 띠 */
@@ -241,10 +283,10 @@ const tickC=document.createElement('canvas');tickC.width=2048;tickC.height=96;
 const tickT=new THREE.CanvasTexture(tickC);tickT.colorSpace=THREE.SRGBColorSpace;tickT.wrapS=THREE.RepeatWrapping;tickT.repeat.x=.7;
 const tickM=new THREE.MeshBasicMaterial({map:tickT}),dark=M('#111');
 const band=new THREE.Mesh(BOX,[dark,dark,dark,dark,tickM,dark]);band.scale.set(22,1.2,.25);band.position.set(0,13.6,-14.1);scene.add(band);
-box(22.4,.15,.35,glow('#ffd23a'),0,14.27,-14.1);box(22.4,.15,.35,glow('#ffd23a'),0,12.93,-14.1);
+box(22.4,.15,.35,glow('#fcd535'),0,14.27,-14.1);box(22.4,.15,.35,glow('#fcd535'),0,12.93,-14.1);
 function drawTicker(){const g=tickC.getContext('2d'),bd=boards();g.fillStyle='#050505';g.fillRect(0,0,2048,96);
   g.font='800 52px Pretendard, sans-serif';g.textBaseline='middle';g.textAlign='left';let x=20;
-  const parts=[['BTC/USDT ',bd[0].v+' '+(bd[0].s.split(' ')[0]||''),bd[0].c],['UPBIT ',bd[1].v,bd[1].c],['KIMP ',bd[2].v,'#ffd23a'],['ATH 대비 ',bd[3].v,DN],['저점 대비 ',bd[4].v,UP]];
+  const parts=[['BTC/USDT ',bd[0].v+' '+(bd[0].s.split(' ')[0]||''),D.bnP>=0?UP:DN],['UPBIT ',bd[1].v,D.ubP>=0?UP:DN],['KIMP ',bd[2].v,Y],['ATH 대비 ',bd[3].v,DN],['저점 대비 ',bd[4].v,UP]];
   for(const [a,b,c] of parts){g.fillStyle='#ffd23a';g.fillText(a,x,50);x+=g.measureText(a).width;g.fillStyle=c;g.fillText(b,x,50);x+=g.measureText(b).width+30;
     g.fillStyle='#555';g.fillText('◆',x,50);x+=60}
   tickT.needsUpdate=true}
